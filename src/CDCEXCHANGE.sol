@@ -26,7 +26,7 @@ contract CDCEXCHANGEEvents {
     event LogFeedValid(bool feedValid);
 }
 
-contract CDCEXCHANGE is DSAuth, DSStop, DSMath, DPTICOEvents {
+contract CDCEXCHANGE is DSAuth, DSStop, DSMath, CDCEXCHANGEEvents {
     uint public cdcUsdRate;              //usd price of 1 CDC token. 18 digit precision
     uint public ethUsdRate;              //price of ETH in USD. 18 digit precision
     MedianizerLike public priceFeed;     //address of the Makerdao price feed

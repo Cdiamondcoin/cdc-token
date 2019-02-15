@@ -1,0 +1,7 @@
+build/
+.DS_Store
+*.swp
+out/
+keystore
+env
+bin/deploy-rinkeby
