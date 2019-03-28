@@ -15,7 +15,7 @@ In order to compile smart contracts you need to install [Dapphub](https://dapphu
 
 ## Use custom version of solidity compiler
 
-`dapp --use solc:0.4.24 build`
+`dapp --use solc:0.4.25 build`
 
 ## Building smart contracts
 
