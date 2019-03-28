@@ -1,4 +1,4 @@
-pragma solidity ^0.4.23;
+pragma solidity ^0.4.25;
 
 import "ds-token/token.sol";
 
@@ -7,7 +7,7 @@ import "ds-token/token.sol";
  * @dev CDC coin.
  */
 contract CDC is DSToken {
-    string public constant name = "CDC";
+    string public constant name = "Certified Diamond Coin";
     bytes32 public constant symbol = "CDC";
     uint8 public constant decimals = 18 ;
 
@@ -18,13 +18,5 @@ contract CDC is DSToken {
         uint totalSupply_ = mul(10 ** 7, (10 ** uint(decimals)));
         super.mint(totalSupply_);
         transfer(owner, totalSupply_);
-    }
-
-    /**
-    * @dev override mint() function in DSToken so that no token can be minted only once in the constructor()
-    */
-    function mint(uint) public {
-        // TODO: Implement minting
-        revert("No minting possible.");
     }
 }

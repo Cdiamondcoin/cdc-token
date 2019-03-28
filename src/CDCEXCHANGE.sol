@@ -1,4 +1,4 @@
-pragma solidity ^0.4.23;
+pragma solidity ^0.4.25;
 
 import "ds-math/math.sol";
 import "ds-auth/auth.sol";
@@ -31,7 +31,7 @@ contract CDCEXCHANGE is DSAuth, DSStop, DSMath, CDCEXCHANGEEvents {
     uint public ethUsdRate;              //price of ETH in USD. 18 digit precision
     MedianizerLike public priceFeed;     //address of the Makerdao price feed
     bool public feedValid;               //if true feed has valid USD/ETH rate
-    ERC20 public CDC;                    //CDC token contract
+    ERC20 public dpt;                    //CDC token contract
     ERC20 public cdc;                    //CDC token contract
     bool public manualUsdRate = true;    //if true enables token buy even if priceFeed does not provide valid data
     uint public minDptInvestmentAmount = 0; //minimal amount of CDC to buy, if equal with 0 than validation is disabled
@@ -41,7 +41,7 @@ contract CDCEXCHANGE is DSAuth, DSStop, DSMath, CDCEXCHANGEEvents {
     */
     constructor(address cdc_, address dpt_, address priceFeed_, uint cdcUsdRate_, uint ethUsdRate_) public {
         cdc = ERC20(cdc_);
-        CDC = ERC20(dpt_);
+        dpt = ERC20(dpt_);
         priceFeed = MedianizerLike(priceFeed_);
         cdcUsdRate = cdcUsdRate_;
         ethUsdRate = ethUsdRate_;

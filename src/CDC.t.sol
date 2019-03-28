@@ -1,4 +1,4 @@
-pragma solidity ^0.4.23;
+pragma solidity ^0.4.25;
 
 import "ds-test/test.sol";
 import "ds-token/base.sol";
@@ -22,16 +22,16 @@ contract CDCTest is DSTest {
         user = new CDCTester(cdc);
     }
 
-    function testFailMint() public {
+    function testMint() public {
         cdc.mint(10 ether);
     }
 
     function testWeReallyGotAllTokens() public {
-        cdc.transfer(user,CDC_SUPPLY);
+        cdc.transfer(user, CDC_SUPPLY);
         assertEq(cdc.balanceOf(this), 0);
     }
 
     function testFailSendMoreThanAvailable() public {
-        cdc.transfer(user,CDC_SUPPLY + 1);
+        cdc.transfer(user, CDC_SUPPLY + 1);
     }
 }
