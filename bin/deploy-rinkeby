@@ -29,11 +29,23 @@ test -z $NETWORK && exit 1
 dapp --use solc:0.4.25 build
 
 hevm flatten --source-file src/CDC.sol --json-file out/CDC.sol.json > out/CDC-flatt.sol
+hevm flatten --source-file src/CDCEXCHANGE.sol --json-file out/CDCEXCHANGE.sol.json > out/CDCEXCHANGE-flatt.sol
 
 CDC=$(dapp create CDC)
+export CDC=$CDC
 
-echo -e "CDC DEPLOYED AT: $CDC\n"
+echo -e "CDC DEPLOYED AT: $CDC"
 
+test -z $CDC && exit 1
+
+CDC_ETH_RATE=0.5    # CDC price in terms of ETH (you can modify it in the smart ocntract)
+
+CDCEXCHANGE=$(dapp create CDCEXCHANGE "$CDC" "$(seth --to-uint256 $(seth --to-wei $CDC_ETH_RATE eth))")
+export CDCEXCHANGE=$CDCEXCHANGE
+echo -e "CDCEXCHANGE DEPLOYED AT: $CDCEXCHANGE"
+
+# enable CDCEXCHANGE to manage CDC tokens
+seth send $CDC "approve(address,uint)" $CDCEXCHANGE ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
 
 # seth send 0x9537040cd32ed8abd5f04fbb7b83f619626a5079 "mintDiamondTo(address, string memory, uint, string memory)" 0x9556E25F9b4D343ee38348b6Db8691d10fD08A61 "7296159263" 00000000000000000000000000000000000000000000000009da6d3cfe870000 ""
 # seth call 0x9537040cd32ed8abd5f04fbb7b83f619626a5079 "diamondCaratByIndex(uint)" 0
