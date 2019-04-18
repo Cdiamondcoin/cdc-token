@@ -19,12 +19,22 @@ contract CDCEXCHANGEEvents {
         uint cdcValue,
         uint rate
     );
+    event LogBuyTokenWithFee(
+        address owner,
+        address sender,
+        uint ethValue,
+        uint cdcValue,
+        uint rate,
+        uint fee
+    );
 }
 
 contract CDCEXCHANGE is DSAuth, DSStop, DSMath, CDCEXCHANGEEvents {
-    ERC20 public cdc;                    //CDC token contract
-    ERC20 public dpt;                    //DPT token contract
-    uint public rate;                    //price of 1 CDC token. 18 digit precision
+    ERC20 public cdc;                       //CDC token contract
+    ERC20 public dpt;                       //DPT token contract
+    uint public rate;                       //price of 1 CDC token. 18 digit precision
+    // TODO: mutable?
+    uint public constant fee = 0.015 ether; //fee on buy CDC via dApp
 
     /**
     * @dev Constructor
@@ -57,6 +67,13 @@ contract CDCEXCHANGE is DSAuth, DSStop, DSMath, CDCEXCHANGEEvents {
     }
 
     /**
+    * @dev Approve fee charge.
+    */
+    function approveFee(uint amount) public {
+        dpt.approve(recipient, amount)
+    }
+
+    /**
     * @dev Тoken purchase with DPT fee function.
     */
     function buyTokensWithFee() public payable stoppable {
@@ -66,9 +83,9 @@ contract CDCEXCHANGE is DSAuth, DSStop, DSMath, CDCEXCHANGEEvents {
         tokens = wdiv(msg.value, rate);
 
         address(owner).transfer(msg.value);
-        dpt.transferFrom(msg.sender, owner, 0.015 ether);
+        dpt.transferFrom(msg.sender, owner, fee);
         cdc.transferFrom(owner, msg.sender, tokens);
-        emit LogBuyToken(owner, msg.sender, msg.value, tokens, rate);
+        emit LogBuyTokenWithFee(owner, msg.sender, msg.value, tokens, rate, fee);
     }
 
     /**
