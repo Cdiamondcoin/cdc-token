@@ -23,13 +23,15 @@ contract CDCEXCHANGEEvents {
 
 contract CDCEXCHANGE is DSAuth, DSStop, DSMath, CDCEXCHANGEEvents {
     ERC20 public cdc;                    //CDC token contract
+    ERC20 public dpt;                    //DPT token contract
     uint public rate;                    //price of 1 CDC token. 18 digit precision
 
     /**
     * @dev Constructor
     */
-    constructor(address cdc_, uint rate_) public {
+    constructor(address cdc_, address dpt_, uint rate_) public {
         cdc = ERC20(cdc_);
+        dpt = ERC20(dpt_);
         rate = rate_;
     }
 
@@ -41,7 +43,7 @@ contract CDCEXCHANGE is DSAuth, DSStop, DSMath, CDCEXCHANGEEvents {
     }
 
     /**
-    * @dev Low level token purchase function.
+    * @dev Тoken purchase function.
     */
     function buyTokens() public payable stoppable {
         require(msg.value != 0, "Invalid amount");
@@ -50,6 +52,21 @@ contract CDCEXCHANGE is DSAuth, DSStop, DSMath, CDCEXCHANGEEvents {
         tokens = wdiv(msg.value, rate);
 
         address(owner).transfer(msg.value);
+        cdc.transferFrom(owner, msg.sender, tokens);
+        emit LogBuyToken(owner, msg.sender, msg.value, tokens, rate);
+    }
+
+    /**
+    * @dev Тoken purchase with DPT fee function.
+    */
+    function buyTokensWithFee() public payable stoppable {
+        require(msg.value != 0, "Invalid amount");
+
+        uint tokens;
+        tokens = wdiv(msg.value, rate);
+
+        address(owner).transfer(msg.value);
+        dpt.transferFrom(msg.sender, owner, 0.015 ether);
         cdc.transferFrom(owner, msg.sender, tokens);
         emit LogBuyToken(owner, msg.sender, msg.value, tokens, rate);
     }
