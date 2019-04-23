@@ -67,13 +67,6 @@ contract CDCEXCHANGE is DSAuth, DSStop, DSMath, CDCEXCHANGEEvents {
     }
 
     /**
-    * @dev Approve fee charge.
-    */
-    function approveFee(uint amount) public {
-        dpt.approve(recipient, amount)
-    }
-
-    /**
     * @dev Тoken purchase with DPT fee function.
     */
     function buyTokensWithFee() public payable stoppable {
