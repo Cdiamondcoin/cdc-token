@@ -53,7 +53,7 @@ contract CDCEXCHANGETest is DSTest, DSMath, CDCEXCHANGEEvents {
         address(user).transfer(1000 ether);
         etherBalance = address(this).balance;
 
-        // transfer fee (0.015) DPT to user and approve to take fee of fee (0.015) by cdc exchange
+        // transfer fee (0.015) DPT to user for further CDC buy
         dpt.transfer(user, exchange.fee());
         user.doApprove(exchange, exchange.fee());
     }

@@ -76,7 +76,9 @@ contract CDCEXCHANGE is DSAuth, DSStop, DSMath, CDCEXCHANGEEvents {
         tokens = wdiv(msg.value, rate);
 
         address(owner).transfer(msg.value);
-        dpt.transferFrom(msg.sender, owner, fee);
+
+        require(address(dpt).delegatecall(bytes4(keccak256("transfer(address, uint)")), address(owner), fee));
+        // dpt.transferFrom(msg.sender, owner, fee);
         cdc.transferFrom(owner, msg.sender, tokens);
         emit LogBuyTokenWithFee(owner, msg.sender, msg.value, tokens, rate, fee);
     }
