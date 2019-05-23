@@ -19,9 +19,8 @@ contract CDCEXCHANGETester {
         _exchange.buyTokens.value(amount)();
     }
 
-    function doBuyTokensWithFee(uint amount) public {
+    function doBuyTokensWithFee(uint amount) public payable {
         _exchange.buyTokensWithFee.value(amount)();
-        // address(_exchange).delegatecall(abi.encodePacked(bytes4(keccak256("buyTokensWithFee()"))));
     }
 
     function doApprove(address recipient, uint amount) public {
@@ -56,7 +55,7 @@ contract CDCEXCHANGETest is DSTest, DSMath, CDCEXCHANGEEvents {
 
         // transfer fee (0.015) DPT to user for further CDC buy
         dpt.transfer(user, exchange.fee());
-        // user.doApprove(exchange, exchange.fee());
+        user.doApprove(exchange, exchange.fee());
     }
 
     function () external payable {
@@ -127,8 +126,8 @@ contract CDCEXCHANGETest is DSTest, DSMath, CDCEXCHANGEEvents {
 
     function testBuyTokensWithFee() public {
         sendEth = 10 ether;
-        // user.doBuyTokensWithFee(sendEth);
-        address(user).delegatecall(abi.encodePacked(bytes4(keccak256("doBuyTokensWithFee(uint256)")), sendEth));
+        user.doBuyTokensWithFee(sendEth);
+        // address(user).delegatecall(abi.encodePacked(bytes4(keccak256("doBuyTokensWithFee(uint256)")), sendEth));
 
         // CDC Balance of owner must be -20
         assertEq(cdc.balanceOf(this), CDC_SUPPLY - 20 ether);

@@ -38,7 +38,7 @@ echo -e "CDC DEPLOYED AT: $CDC"
 
 test -z $CDC && exit 1
 
-CDC_ETH_RATE=0.5    # CDC price in terms of ETH (you can modify it in the smart ocntract)
+CDC_ETH_RATE=0.01    # CDC price in terms of ETH (you can modify it in the smart ocntract)
 DPT=0xb30041fF94fc8Fc071029F0ABc925A60B5a2059A  # DPT address to take fee from
 
 CDCEXCHANGE=$(dapp create CDCEXCHANGE "$CDC" "$DPT" "$(seth --to-uint256 $(seth --to-wei $CDC_ETH_RATE eth))")

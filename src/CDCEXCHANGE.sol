@@ -69,20 +69,16 @@ contract CDCEXCHANGE is DSAuth, DSStop, DSMath, CDCEXCHANGEEvents {
     /**
     * @dev Тoken purchase with DPT fee function.
     */
-    function buyTokensWithFee() public payable stoppable {
+    function buyTokensWithFee() public payable stoppable returns (uint tokens) {
         require(msg.value != 0, "Invalid amount");
 
-        uint tokens = wdiv(msg.value, rate);
+        tokens = wdiv(msg.value, rate);
         address(owner).transfer(msg.value);
-        // dpt.approve(address(this), fee);
-        // dpt.transferFrom(msg.sender, owner, fee);
 
-        // dpt.delegatecall(abi.encodePacked(bytes4(keccak256("transfer(address, uint256)")), address(owner), fee));
-        // dpt.delegatecall(abi.encodePacked(bytes4(keccak256("transferFrom(address, address, uint256)")), address(msg.sender), address(owner), fee));
-
-        dpt.transfer(address(owner), fee);
+        dpt.transferFrom(msg.sender, address(owner), fee);
         cdc.transferFrom(owner, msg.sender, tokens);
         emit LogBuyTokenWithFee(owner, msg.sender, msg.value, tokens, rate, fee);
+        return tokens;
     }
 
     /**
