@@ -2,15 +2,15 @@ pragma solidity ^0.4.25;
 
 import "ds-test/test.sol";
 import "ds-math/math.sol";
-import "./CDCEXCHANGE.sol";
-import "./CDC.sol";
+import "./CdcExchange.sol";
+import "./Cdc.sol";
 
 
-contract CDCEXCHANGETester {
-    CDCEXCHANGE public _exchange;
+contract CdcExchangeTester {
+    CdcExchange public _exchange;
     ERC20 public _dpt;
 
-    constructor(CDCEXCHANGE exchange, ERC20 dpt) public {
+    constructor(CdcExchange exchange, ERC20 dpt) public {
         _exchange = exchange;
         _dpt = dpt;
     }
@@ -31,29 +31,29 @@ contract CDCEXCHANGETester {
     }
 }
 
-contract CDCEXCHANGETest is DSTest, DSMath, CDCEXCHANGEEvents {
-    uint constant CDC_SUPPLY = (10 ** 7) * (10 ** 18);
-    CDC cdc;
+contract CdcExchangeTest is DSTest, DSMath, CdcExchangeEvents {
+    uint constant Cdc_SUPPLY = (10 ** 7) * (10 ** 18);
+    Cdc cdc;
     ERC20 dpt;
-    CDCEXCHANGE exchange;
-    CDCEXCHANGETester user;
+    CdcExchange exchange;
+    CdcExchangeTester user;
     uint etherBalance;
     uint sendEth;
     uint rate = 0.5 ether;
 
     function setUp() public {
-        cdc = new CDC();
-        dpt = new CDC();
-        exchange = new CDCEXCHANGE(cdc, dpt, rate);
-        user = new CDCEXCHANGETester(exchange, dpt);
+        cdc = new Cdc();
+        dpt = new Cdc();
+        exchange = new CdcExchange(cdc, dpt, rate);
+        user = new CdcExchangeTester(exchange, dpt);
         cdc.approve(exchange, uint(-1));
-        require(cdc.balanceOf(this) == CDC_SUPPLY);
-        require(dpt.balanceOf(this) == CDC_SUPPLY);
+        require(cdc.balanceOf(this) == Cdc_SUPPLY);
+        require(dpt.balanceOf(this) == Cdc_SUPPLY);
         require(address(this).balance >= 1000 ether);
         address(user).transfer(1000 ether);
         etherBalance = address(this).balance;
 
-        // transfer fee (0.015) DPT to user for further CDC buy
+        // transfer fee (0.015) DPT to user for further Cdc buy
         dpt.transfer(user, exchange.fee());
         user.doApprove(exchange, exchange.fee());
     }
@@ -73,7 +73,7 @@ contract CDCEXCHANGETest is DSTest, DSMath, CDCEXCHANGEEvents {
     function testOthersBuyTenTokens() public {
         sendEth = 10 ether;
         user.doBuyTokens(sendEth);
-        assertEq(cdc.balanceOf(this),CDC_SUPPLY - 20 ether);
+        assertEq(cdc.balanceOf(this),Cdc_SUPPLY - 20 ether);
     }
 
     function testFailBuyTenTokensIfExchangeStopped() public {
@@ -82,7 +82,7 @@ contract CDCEXCHANGETest is DSTest, DSMath, CDCEXCHANGEEvents {
         buyTokens(sendEth);
     }
 
-    function testCDCEXCHANGECanBeRestarted() public {
+    function testCdcExchangeCanBeRestarted() public {
         sendEth = 10 ether;
         exchange.stop();
         exchange.start();
@@ -107,7 +107,7 @@ contract CDCEXCHANGETest is DSTest, DSMath, CDCEXCHANGEEvents {
     function testBuyTokens() public {
         sendEth = 10 ether;
         user.doBuyTokens(sendEth);
-        assertEq(cdc.balanceOf(this), CDC_SUPPLY - 20 ether);
+        assertEq(cdc.balanceOf(this), Cdc_SUPPLY - 20 ether);
         assertEq(cdc.balanceOf(user), 20 ether);
     }
 
@@ -115,7 +115,7 @@ contract CDCEXCHANGETest is DSTest, DSMath, CDCEXCHANGEEvents {
         sendEth = 0.18447 ether;
         exchange.setRate(sendEth);
         user.doBuyTokens(sendEth);
-        assertEq(cdc.balanceOf(this), CDC_SUPPLY - 1 ether);
+        assertEq(cdc.balanceOf(this), Cdc_SUPPLY - 1 ether);
         assertEq(cdc.balanceOf(user), 1 ether);
     }
 
@@ -129,13 +129,13 @@ contract CDCEXCHANGETest is DSTest, DSMath, CDCEXCHANGEEvents {
         user.doBuyTokensWithFee(sendEth);
         // address(user).delegatecall(abi.encodePacked(bytes4(keccak256("doBuyTokensWithFee(uint256)")), sendEth));
 
-        // CDC Balance of owner must be -20
-        assertEq(cdc.balanceOf(this), CDC_SUPPLY - 20 ether);
-        // CDC Balance of user must be +20
+        // Cdc Balance of owner must be -20
+        assertEq(cdc.balanceOf(this), Cdc_SUPPLY - 20 ether);
+        // Cdc Balance of user must be +20
         assertEq(cdc.balanceOf(user), 20 ether);
         // DPT Balance of user must be -0.015 (fee amount)
         assertEq(dpt.balanceOf(user), 0);
         // DPT Balance of owner must be +0.015 (fee amount)
-        assertEq(dpt.balanceOf(this), CDC_SUPPLY);
+        assertEq(dpt.balanceOf(this), Cdc_SUPPLY);
     }
 }

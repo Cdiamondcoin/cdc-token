@@ -3,12 +3,12 @@ pragma solidity ^0.4.25;
 import "ds-token/token.sol";
 
 /**
- * @title CDC
- * @dev CDC coin.
+ * @title Cdc
+ * @dev Cdc coin.
  */
-contract CDC is DSToken {
+contract Cdc is DSToken {
     string public constant name = "Certified Diamond Coin";
-    bytes32 public constant symbol = "CDC";
+    bytes32 public constant symbol = "Cdc";
     uint8 public constant decimals = 18 ;
 
     /**

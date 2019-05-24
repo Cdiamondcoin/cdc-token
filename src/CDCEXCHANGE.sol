@@ -8,10 +8,10 @@ import "ds-note/note.sol";
 
 
 /**
- * @title CDC
- * @dev CDC EXCHANGE contract.
+ * @title Cdc
+ * @dev Cdc Exchange contract.
  */
-contract CDCEXCHANGEEvents {
+contract CdcExchangeEvents {
     event LogBuyToken(
         address owner,
         address sender,
@@ -29,12 +29,12 @@ contract CDCEXCHANGEEvents {
     );
 }
 
-contract CDCEXCHANGE is DSAuth, DSStop, DSMath, CDCEXCHANGEEvents {
-    ERC20 public cdc;                       //CDC token contract
+contract CdcExchange is DSAuth, DSStop, DSMath, CdcExchangeEvents {
+    ERC20 public cdc;                       //Cdc token contract
     ERC20 public dpt;                       //DPT token contract
-    uint public rate;                       //price of 1 CDC token. 18 digit precision
+    uint public rate;                       //price of 1 Cdc token. 18 digit precision
     // TODO: mutable?
-    uint public constant fee = 0.015 ether; //fee on buy CDC via dApp
+    uint public constant fee = 0.015 ether; //fee on buy Cdc via dApp
 
     /**
     * @dev Constructor
@@ -82,7 +82,7 @@ contract CDCEXCHANGE is DSAuth, DSStop, DSMath, CDCEXCHANGEEvents {
     }
 
     /**
-    * @dev Set exchange rate CDC/ETH value.
+    * @dev Set exchange rate Cdc/ETH value.
     */
     function setRate(uint rate_) public auth note {
         require(rate_ > 0, "Invalid amount");

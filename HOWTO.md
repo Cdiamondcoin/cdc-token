@@ -22,7 +22,7 @@ with open('/Users/vgaicuks/code/cdc-token/rinkeby.keystore', 'w') as f:
 ### Flatten contract to upload code etherscan
 
 ```bash
-hevm flatten --source-file src/CDC.sol --json-file out/CDC.sol.json > CDC-flatt.sol
+hevm flatten --source-file src/Cdc.sol --json-file out/Cdc.sol.json > Cdc-flatt.sol
 ```
 
 ### Get compiller version (set on upload time)

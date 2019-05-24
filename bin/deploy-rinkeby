@@ -28,25 +28,25 @@ test -z $NETWORK && exit 1
 
 dapp --use solc:0.4.25 build
 
-hevm flatten --source-file src/CDC.sol --json-file out/CDC.sol.json > out/CDC-flatt.sol
-hevm flatten --source-file src/CDCEXCHANGE.sol --json-file out/CDCEXCHANGE.sol.json > out/CDCEXCHANGE-flatt.sol
+hevm flatten --source-file src/Cdc.sol --json-file out/Cdc.sol.json > out/Cdc-flatt.sol
+hevm flatten --source-file src/CdcEXCHANGE.sol --json-file out/CdcEXCHANGE.sol.json > out/CdcEXCHANGE-flatt.sol
 
-CDC=$(dapp create CDC)
-export CDC=$CDC
+Cdc=$(dapp create Cdc)
+export Cdc=$Cdc
 
-echo -e "CDC DEPLOYED AT: $CDC"
+echo -e "Cdc DEPLOYED AT: $Cdc"
 
-test -z $CDC && exit 1
+test -z $Cdc && exit 1
 
-CDC_ETH_RATE=0.01    # CDC price in terms of ETH (you can modify it in the smart ocntract)
+Cdc_ETH_RATE=0.01    # Cdc price in terms of ETH (you can modify it in the smart ocntract)
 DPT=0xb30041fF94fc8Fc071029F0ABc925A60B5a2059A  # DPT address to take fee from
 
-CDCEXCHANGE=$(dapp create CDCEXCHANGE "$CDC" "$DPT" "$(seth --to-uint256 $(seth --to-wei $CDC_ETH_RATE eth))")
-export CDCEXCHANGE=$CDCEXCHANGE
-echo -e "CDCEXCHANGE DEPLOYED AT: $CDCEXCHANGE"
+CdcEXCHANGE=$(dapp create CdcEXCHANGE "$Cdc" "$DPT" "$(seth --to-uint256 $(seth --to-wei $Cdc_ETH_RATE eth))")
+export CdcEXCHANGE=$CdcEXCHANGE
+echo -e "CdcEXCHANGE DEPLOYED AT: $CdcEXCHANGE"
 
-# enable CDCEXCHANGE to manage CDC tokens
-seth send $CDC "approve(address,uint)" $CDCEXCHANGE ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
+# enable CdcEXCHANGE to manage Cdc tokens
+seth send $Cdc "approve(address,uint)" $CdcEXCHANGE ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
 
 # seth send 0x9537040cd32ed8abd5f04fbb7b83f619626a5079 "mintDiamondTo(address, string memory, uint, string memory)" 0x9556E25F9b4D343ee38348b6Db8691d10fD08A61 "7296159263" 00000000000000000000000000000000000000000000000009da6d3cfe870000 ""
 # seth call 0x9537040cd32ed8abd5f04fbb7b83f619626a5079 "diamondCaratByIndex(uint)" 0
@@ -54,4 +54,4 @@ seth send $CDC "approve(address,uint)" $CDCEXCHANGE ffffffffffffffffffffffffffff
 
 
 # Verify code on Etherscan
-# hevm flatten --source-file src/CDC.sol --json-file out/CDC.sol.json > out/CDC-flatt.sol
+# hevm flatten --source-file src/Cdc.sol --json-file out/Cdc.sol.json > out/Cdc-flatt.sol

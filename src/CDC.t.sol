@@ -2,24 +2,24 @@ pragma solidity ^0.4.25;
 
 import "ds-test/test.sol";
 import "ds-token/base.sol";
-import "./CDC.sol";
+import "./Cdc.sol";
 
-contract CDCTester {
-    CDC public _cdc;
+contract CdcTester {
+    Cdc public _cdc;
 
-    constructor(CDC cdc) public {
+    constructor(Cdc cdc) public {
         _cdc = cdc;
     }
 }
 
-contract CDCTest is DSTest {
-    uint constant CDC_SUPPLY = (10 ** 7) * (10 ** 18);
-    CDC cdc;
-    CDCTester user;
+contract CdcTest is DSTest {
+    uint constant Cdc_SUPPLY = (10 ** 7) * (10 ** 18);
+    Cdc cdc;
+    CdcTester user;
 
     function setUp() public {
-        cdc = new CDC();
-        user = new CDCTester(cdc);
+        cdc = new Cdc();
+        user = new CdcTester(cdc);
     }
 
     function testMint() public {
@@ -27,11 +27,11 @@ contract CDCTest is DSTest {
     }
 
     function testWeReallyGotAllTokens() public {
-        cdc.transfer(user, CDC_SUPPLY);
+        cdc.transfer(user, Cdc_SUPPLY);
         assertEq(cdc.balanceOf(this), 0);
     }
 
     function testFailSendMoreThanAvailable() public {
-        cdc.transfer(user, CDC_SUPPLY + 1);
+        cdc.transfer(user, Cdc_SUPPLY + 1);
     }
 }

@@ -36,9 +36,9 @@ As a result of installation .abi and .bin files will be created in `cdc-token/ou
 ## Deploying smart contracts
 
 In order to deploy smart contracts you need to do the followings.
-- Deploy `cdc-token/out/CDC.abi` `cdc-token/out/CDC.bin` to install cdc token.
-- Deploy `cdc-token/out/CDCEXCHANGE.abi` `cdc-token/out/CDCEXCHANGE.bin` to install CDC EXCHANGE smart contract.
-- Lets assume `CDC` is the address of CDC token, and `EXCHANGE` is the address of EXCHANGE smart contract. Execute as owner `(CDC).approve(EXCHANGE, uint(-1))` to enable for EXCHANGE smart contract to manipulate CDC tokens.
+- Deploy `cdc-token/out/Cdc.abi` `cdc-token/out/Cdc.bin` to install cdc token.
+- Deploy `cdc-token/out/CdcExchange.abi` `cdc-token/out/CdcExchange.bin` to install Cdc Exchange smart contract.
+- Lets assume `Cdc` is the address of CDC token, and `Exchange` is the address of Exchange smart contract. Execute as owner `(Cdc).approve(Exchange, uint(-1))` to enable for Exchange smart contract to manipulate CDC tokens.
 
 ## Authors
 
