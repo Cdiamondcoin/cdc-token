@@ -33,8 +33,7 @@ contract CdcExchange is DSAuth, DSStop, DSMath, CdcExchangeEvents {
     ERC20 public cdc;                       //Cdc token contract
     ERC20 public dpt;                       //DPT token contract
     uint public rate;                       //price of 1 Cdc token. 18 digit precision
-    // TODO: mutable?
-    uint public constant fee = 0.015 ether; //fee on buy Cdc via dApp
+    uint public fee = 0.015 ether;          //fee on buy Cdc via dApp
 
     /**
     * @dev Constructor
@@ -87,5 +86,9 @@ contract CdcExchange is DSAuth, DSStop, DSMath, CdcExchangeEvents {
     function setRate(uint rate_) public auth note {
         require(rate_ > 0, "Invalid amount");
         rate = rate_;
+    }
+
+    function setFee(uint fee_) public auth note {
+        fee = fee_;
     }
 }

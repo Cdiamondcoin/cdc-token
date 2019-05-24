@@ -127,7 +127,6 @@ contract CdcExchangeTest is DSTest, DSMath, CdcExchangeEvents {
     function testBuyTokensWithFee() public {
         sendEth = 10 ether;
         user.doBuyTokensWithFee(sendEth);
-        // address(user).delegatecall(abi.encodePacked(bytes4(keccak256("doBuyTokensWithFee(uint256)")), sendEth));
 
         // Cdc Balance of owner must be -20
         assertEq(cdc.balanceOf(this), Cdc_SUPPLY - 20 ether);
@@ -137,5 +136,11 @@ contract CdcExchangeTest is DSTest, DSMath, CdcExchangeEvents {
         assertEq(dpt.balanceOf(user), 0);
         // DPT Balance of owner must be +0.015 (fee amount)
         assertEq(dpt.balanceOf(this), Cdc_SUPPLY);
+    }
+
+    function testFee() public {
+        assertEq(exchange.fee(), 0.015 ether);
+        exchange.setFee(1 ether);
+        assertEq(exchange.fee(), 1 ether);
     }
 }
