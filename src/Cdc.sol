@@ -8,7 +8,7 @@ import "ds-token/token.sol";
  */
 contract Cdc is DSToken {
     string public constant name = "Certified Diamond Coin";
-    bytes32 public constant symbol = "Cdc";
+    bytes32 public constant symbol = "CDC";
     uint8 public constant decimals = 18 ;
 
     /**
