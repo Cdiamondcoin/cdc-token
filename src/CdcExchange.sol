@@ -108,21 +108,20 @@ contract CdcExchange is DSAuth, DSStop, DSMath, CdcExchangeEvents {
     /**
     * @dev Тoken purchase with DPT fee function.
     */
+    // TODO: auth to call this function
     function buyTokensWithFee() public payable stoppable returns (uint tokens) {
         require(msg.value != 0, "Invalid amount");
 
-        // to avoid "Expression has to be an lvalue" while do sub()
-        uint sentEth = msg.value;
         uint feeEth = takeDptFee();
+        uint ethAmountToBuyCdc = sub(msg.value, feeEth);
 
-        sentEth = sub(sentEth, feeEth);
         // Transfer ETH for fee
         address(dptSeller).transfer(feeEth);
 
-        tokens = wmul(sentEth, ethCdcRate);
+        tokens = wmul(ethAmountToBuyCdc, ethCdcRate);
         cdc.transferFrom(owner, msg.sender, tokens);
         // Transfer ETH for CDC
-        address(owner).transfer(sentEth);
+        address(owner).transfer(ethAmountToBuyCdc);
 
         // burn DPT fee
         dpt.burn(fee);
