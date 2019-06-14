@@ -19,34 +19,39 @@ export SOLC_FLAGS=${SOLC_FLAGS:-"--optimize"}
 export ETH_GAS=${ETH_GAS:-"4000000"}
 # 1000000000 wei = 1 gwei
 export ETH_GAS_PRICE=${ETH_GAS_PRICE:-"10000000000"}
-export NETWORK=$(seth chain)
 
 # export ETH_FROM=$(seth rpc eth_coinbase)
 export ETH_FROM=0x9556E25F9b4D343ee38348b6Db8691d10fD08A61
 
-test -z $NETWORK && exit 1
 
 dapp --use solc:0.4.25 build
 
 hevm flatten --source-file src/Cdc.sol --json-file out/Cdc.sol.json > out/Cdc-flatt.sol
 hevm flatten --source-file src/CdcExchange.sol --json-file out/CdcExchange.sol.json > out/CdcExchange-flatt.sol
 
-CDC=$(dapp create Cdc)
+# CDC=$(dapp create Cdc)
+CDC=0x42aC13dA77bc7204b61C8a44Acba4411Fc34bbbf
 export CDC=$CDC
-
 echo -e "Cdc DEPLOYED AT: $CDC"
-
 test -z $CDC && exit 1
+
+FEED=$(dapp create MedianizerLike $(seth --to-uint256 $(seth --to-wei 0.01 eth)) true)
+export FEED=$FEED
+echo -e "MedianizerLike DEPLOYED AT: $FEED"
+test -z $FEED && exit 1
 
 CDC_ETH_RATE=0.01    # Cdc price in terms of ETH (you can modify it in the smart ocntract)
 DPT=0xb30041fF94fc8Fc071029F0ABc925A60B5a2059A  # DPT address to take fee from
 
-CdcExchange=$(dapp create CdcExchange "$CDC" "$DPT" "$(seth --to-uint256 $(seth --to-wei $CDC_ETH_RATE eth))")
+CdcExchange=$(dapp create CdcExchange "$CDC" "$DPT" "$FEED" "$ETH_FROM")
 export CdcExchange=$CdcExchange
 echo -e "CdcExchange DEPLOYED AT: $CdcExchange"
 
 # enable CdcExchange to manage Cdc tokens
 seth send $CDC "approve(address,uint)" $CdcExchange ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
+
+# enable CdcExchange to manage DPT tokens (for fee)
+seth send $DPT "approve(address,uint)" $CdcExchange ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
 
 # seth send 0x9537040cd32ed8abd5f04fbb7b83f619626a5079 "mintDiamondTo(address, string memory, uint, string memory)" 0x9556E25F9b4D343ee38348b6Db8691d10fD08A61 "7296159263" 00000000000000000000000000000000000000000000000009da6d3cfe870000 ""
 # seth call 0x9537040cd32ed8abd5f04fbb7b83f619626a5079 "diamondCaratByIndex(uint)" 0

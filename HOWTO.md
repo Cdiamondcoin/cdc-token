@@ -36,7 +36,7 @@ solc --version
 ### Build app with selected compiler version
 
 ```bash
-dapp --use solc:0.4.24 build
+dapp --use solc:0.4.25 build
 ```
 
 ### Install another solc version
