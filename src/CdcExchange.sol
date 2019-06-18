@@ -65,12 +65,12 @@ contract CdcExchangeEvents {
 }
 
 contract CdcExchange is DSAuth, DSStop, DSMath, CdcExchangeEvents {
-    DSToken public cdc;                       //CDC token contract
-    DSToken public dpt;                       //DPT token contract
+    DSToken public cdc;                     //CDC token contract
+    DSToken public dpt;                     //DPT token contract
     uint public ethCdcRate = 100 ether;     //how many CDC 1 ETH cost. 18 digit precision
     uint public dptEthRate = 0.01 ether;    //how many ETH 1 DPT cost. 18 digit precision
     uint public fee = 0.015 ether;          //fee in DPT on buying CDC via dApp
-    MedianizerLike public priceFeed;            //address of the price feed
+    MedianizerLike public priceFeed;        //address of the price feed
     address public dptSeller;               //from this address user buy DPT fee
     bool public manualDptRate = true;       //allow set ETH/DPT rate manually
 
@@ -109,7 +109,7 @@ contract CdcExchange is DSAuth, DSStop, DSMath, CdcExchangeEvents {
     * @dev Тoken purchase with DPT fee function.
     */
     // TODO: auth to call this function
-    function buyTokensWithFee() public payable stoppable returns (uint tokens) {
+    function buyTokensWithFee() public payable auth stoppable returns (uint tokens) {
         require(msg.value != 0, "Invalid amount");
 
         uint feeEth = takeDptFee();
