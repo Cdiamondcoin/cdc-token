@@ -35,6 +35,10 @@ contract CdcExchangeTester {
         _exchange.buyTokensWithFee.value(amount)();
     }
 
+    function doDptApprove(address to, uint amount) public {
+        _dpt.approve(to, amount);
+    }
+
     function () external payable {
     }
 }
@@ -110,6 +114,53 @@ contract CdcExchangeTest is DSTest, DSMath, CdcExchangeEvents {
         assertEq(address(user).balance, sub(user_current_balance, sentEth));
         // DPT have to be burned
         assertEq(dpt.balanceOf(this), sub(Cdc_SUPPLY, fee));
+        assertEq(dpt.totalSupply(), sub(Cdc_SUPPLY, fee));
+        // 100 CDC have to transfered to user
+        assertEq(cdc.balanceOf(user), 100 ether);
+    }
+
+    function testBuyTokensWithFeeUserHasDpt() public {
+        uint current_balance = address(this).balance;
+        uint user_current_balance = address(user).balance;
+        uint fee = 1 ether;
+        uint sentEth = 1 ether;
+
+        exchange.setEthCdcRate(100 ether);
+        exchange.setFee(fee);
+
+        dpt.push(user, fee);
+        user.doDptApprove(exchange, fee);
+
+        user.doBuyTokensWithFee(sentEth);
+        // ETH balance have to be correct
+        assertEq(address(this).balance, add(current_balance, sentEth));
+        assertEq(address(user).balance, sub(user_current_balance, sentEth));
+        // DPT have to be burned
+        assertEq(dpt.balanceOf(user), 0);
+        assertEq(dpt.totalSupply(), sub(Cdc_SUPPLY, fee));
+        // 100 CDC have to transfered to user
+        assertEq(cdc.balanceOf(user), 100 ether);
+    }
+
+    function testBuyTokensWithFeeUserHasHalfOfDpt() public {
+        uint current_balance = address(this).balance;
+        uint user_current_balance = address(user).balance;
+        uint fee = 2 ether;
+        uint user_dpt_amount = 1 ether;
+        uint sentEth = 1.01 ether;
+
+        exchange.setEthCdcRate(100 ether);
+        exchange.setFee(fee);
+
+        dpt.push(user, user_dpt_amount);
+        user.doDptApprove(exchange, user_dpt_amount);
+
+        user.doBuyTokensWithFee(sentEth);
+        // ETH balance have to be correct
+        assertEq(address(this).balance, add(current_balance, sentEth));
+        assertEq(address(user).balance, sub(user_current_balance, sentEth));
+        // DPT have to be burned => 0.5 have to be taken from user and 0.5 from seller
+        assertEq(dpt.balanceOf(user), 0);
         assertEq(dpt.totalSupply(), sub(Cdc_SUPPLY, fee));
         // 100 CDC have to transfered to user
         assertEq(cdc.balanceOf(user), 100 ether);

@@ -92,9 +92,9 @@ contract CdcExchange is DSAuth, DSStop, DSMath, CdcExchangeEvents {
     }
 
     /**
-    * @dev Тoken purchase function.
+    * @dev Тoken purchase function without DPT fee
     */
-    function buyTokens() public payable stoppable returns (uint tokens) {
+    function buyTokens() public payable auth stoppable returns (uint tokens) {
         require(msg.value != 0, "Invalid amount");
 
         tokens = wmul(msg.value, ethCdcRate);
@@ -108,11 +108,24 @@ contract CdcExchange is DSAuth, DSStop, DSMath, CdcExchangeEvents {
     /**
     * @dev Тoken purchase with DPT fee function.
     */
-    // TODO: auth to call this function
-    function buyTokensWithFee() public payable auth stoppable returns (uint tokens) {
+    function buyTokensWithFee() public payable stoppable returns (uint tokens) {
         require(msg.value != 0, "Invalid amount");
 
-        uint feeEth = takeDptFee();
+        uint user_dpt_balance = dpt.balanceOf(msg.sender);
+        uint fee_ = fee;
+
+        // User have to give approve before if it has DPT already
+        // User has enough DPT to fee
+        if (user_dpt_balance >= fee) {
+            fee_ = 0;
+            dpt.transferFrom(msg.sender, address(this), fee);
+        // User has less DPT than required
+        } else if (user_dpt_balance > 0 && user_dpt_balance < fee) {
+            fee_ = sub(fee, user_dpt_balance);  // this amount of DPT user must to buy
+            dpt.transferFrom(msg.sender, address(this), user_dpt_balance);
+        }
+
+        uint feeEth = takeDptFee(fee_);
         uint ethAmountToBuyCdc = sub(msg.value, feeEth);
 
         // Transfer ETH for fee
@@ -130,14 +143,11 @@ contract CdcExchange is DSAuth, DSStop, DSMath, CdcExchangeEvents {
     }
 
     /**
-    * @dev DPT fee transfer.
+    * @dev DPT required fee amount transfer.
     */
-    // TODO: only authorized addresses can call this function
-    function takeDptFee() internal returns (uint ethAmount) {
+    function takeDptFee(uint fee_) internal returns (uint ethAmount) {
         bytes32 dptEthRateBytes;
         bool feedValid;
-
-        require(msg.value != 0, "Invalid ETH amount");
 
         // receive ETH/DPT price from external feed
         (dptEthRateBytes, feedValid) = priceFeed.peek();
@@ -151,11 +161,11 @@ contract CdcExchange is DSAuth, DSStop, DSMath, CdcExchangeEvents {
         }
 
         // calculate fee price in ETH and transfer to owner ETH
-        ethAmount = wmul(dptEthRate, fee);
+        ethAmount = wmul(dptEthRate, fee_);
 
-        // transfer fee to contract, this fee will be burn
-        dpt.transferFrom(dptSeller, address(this), fee);
-        emit LogBuyDptFee(owner, msg.sender, ethAmount, dptEthRate, fee);
+        // transfer fee to contract, this fee will be burned
+        dpt.transferFrom(dptSeller, address(this), fee_);
+        emit LogBuyDptFee(owner, msg.sender, ethAmount, dptEthRate, fee_);
         return ethAmount;
     }
 

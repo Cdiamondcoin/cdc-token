@@ -28,6 +28,7 @@ dapp --use solc:0.4.25 build
 
 hevm flatten --source-file src/Cdc.sol --json-file out/Cdc.sol.json > out/Cdc-flatt.sol
 hevm flatten --source-file src/CdcExchange.sol --json-file out/CdcExchange.sol.json > out/CdcExchange-flatt.sol
+hevm flatten --source-file src/CdcAuthority.sol --json-file out/CdcAuthority.sol.json > out/CdcAuthority-flatt.sol
 
 # CDC=$(dapp create Cdc)
 CDC=0x42aC13dA77bc7204b61C8a44Acba4411Fc34bbbf
@@ -46,6 +47,12 @@ DPT=0xb30041fF94fc8Fc071029F0ABc925A60B5a2059A  # DPT address to take fee from
 CdcExchange=$(dapp create CdcExchange "$CDC" "$DPT" "$FEED" "$ETH_FROM")
 export CdcExchange=$CdcExchange
 echo -e "CdcExchange DEPLOYED AT: $CdcExchange"
+
+CdcAuthority=$(dapp create CdcAuthority)
+export CdcAuthority=$CdcAuthority
+echo -e "CdcAuthority DEPLOYED AT: $CdcAuthority"
+
+seth send $CdcExchange "setAuthority(address)" $CdcAuthority
 
 # enable CdcExchange to manage Cdc tokens
 seth send $CDC "approve(address,uint)" $CdcExchange ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
