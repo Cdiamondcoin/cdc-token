@@ -72,16 +72,24 @@ contract CdcExchange is DSAuth, DSStop, DSMath, CdcExchangeEvents {
     uint public fee = 0.015 ether;          //fee in DPT on buying CDC via dApp
     MedianizerLike public priceFeed;        //address of the price feed
     address public dptSeller;               //from this address user buy DPT fee
+    address public crematorium;             //contract where DPT as fee are stored before be burned
     bool public manualDptRate = true;       //allow set ETH/DPT rate manually
 
     /**
     * @dev Constructor
     */
-    constructor(address cdc_, address dpt_, address priceFeed_, address dptSeller_) public {
+    constructor(
+        address cdc_,
+        address dpt_,
+        address priceFeed_,
+        address dptSeller_,
+        address crematorium_
+    ) public {
         cdc = DSToken(cdc_);
         dpt = DSToken(dpt_);
         priceFeed = MedianizerLike(priceFeed_);
         dptSeller = dptSeller_;
+        crematorium = crematorium_;
     }
 
     /**
@@ -111,18 +119,18 @@ contract CdcExchange is DSAuth, DSStop, DSMath, CdcExchangeEvents {
     function buyTokensWithFee() public payable stoppable returns (uint tokens) {
         require(msg.value != 0, "Invalid amount");
 
-        uint user_dpt_balance = dpt.balanceOf(msg.sender);
+        uint dptUserBalance = dpt.balanceOf(msg.sender);
         uint fee_ = fee;
 
         // User have to give approve before if it has DPT already
         // User has enough DPT to fee
-        if (user_dpt_balance >= fee) {
+        if (dptUserBalance >= fee) {
             fee_ = 0;
             dpt.transferFrom(msg.sender, address(this), fee);
         // User has less DPT than required
-        } else if (user_dpt_balance > 0 && user_dpt_balance < fee) {
-            fee_ = sub(fee, user_dpt_balance);  // this amount of DPT user must to buy
-            dpt.transferFrom(msg.sender, address(this), user_dpt_balance);
+        } else if (dptUserBalance > 0 && dptUserBalance < fee) {
+            fee_ = sub(fee, dptUserBalance);  // this amount of DPT user must to buy
+            dpt.transferFrom(msg.sender, address(this), dptUserBalance);
         }
 
         uint feeEth = takeDptFee(fee_);
@@ -136,15 +144,11 @@ contract CdcExchange is DSAuth, DSStop, DSMath, CdcExchangeEvents {
         // Transfer ETH for CDC
         address(owner).transfer(ethAmountToBuyCdc);
 
-        // burn DPT fee
-        dpt.burn(fee);
+        dpt.transfer(crematorium, fee);
         emit LogBuyTokenWithFee(owner, msg.sender, msg.value, tokens, ethCdcRate, fee);
         return tokens;
     }
 
-    /**
-    * @dev DPT required fee amount transfer.
-    */
     function takeDptFee(uint fee_) internal returns (uint ethAmount) {
         bytes32 dptEthRateBytes;
         bool feedValid;
@@ -158,6 +162,8 @@ contract CdcExchange is DSAuth, DSStop, DSMath, CdcExchangeEvents {
         } else {
             // if feed invalid revert if manualUSDRate_ is NOT allowed
             require(manualDptRate, "Manual rate not allowed");
+            // load manual rate
+            dptEthRate = uint(priceFeed.dptEthRate());
         }
 
         // calculate fee price in ETH and transfer to owner ETH

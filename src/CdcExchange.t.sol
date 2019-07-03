@@ -5,6 +5,7 @@ import "ds-math/math.sol";
 import "ds-token/token.sol";
 import "./CdcExchange.sol";
 import "./Cdc.sol";
+import "./Crematorium.sol";
 
 contract Dpt is DSToken {
     constructor() DSToken('DPT') public {
@@ -50,6 +51,8 @@ contract CdcExchangeTest is DSTest, DSMath, CdcExchangeEvents {
     CdcExchange exchange;
     CdcExchangeTester user;
     MedianizerLike feed;
+    Crematorium crematorium;
+
     uint etherBalance;
     uint sendEth;
     uint ethCdcRate = 30 ether;
@@ -58,7 +61,8 @@ contract CdcExchangeTest is DSTest, DSMath, CdcExchangeEvents {
         cdc = new Cdc();
         dpt = new Dpt();
         feed = new MedianizerLike(0.01 ether, true);
-        exchange = new CdcExchange(cdc, dpt, feed, address(this));
+        crematorium = new Crematorium(dpt);
+        exchange = new CdcExchange(cdc, dpt, feed, address(this), crematorium);
         user = new CdcExchangeTester(exchange, dpt);
         cdc.approve(exchange, uint(-1));
         dpt.approve(exchange, uint(-1));
@@ -112,9 +116,9 @@ contract CdcExchangeTest is DSTest, DSMath, CdcExchangeEvents {
         // ETH balance have to be correct
         assertEq(address(this).balance, add(current_balance, sentEth));
         assertEq(address(user).balance, sub(user_current_balance, sentEth));
-        // DPT have to be burned
+        // DPT fee have to be transfered to crematorium
         assertEq(dpt.balanceOf(this), sub(Cdc_SUPPLY, fee));
-        assertEq(dpt.totalSupply(), sub(Cdc_SUPPLY, fee));
+        assertEq(dpt.balanceOf(crematorium), fee);
         // 100 CDC have to transfered to user
         assertEq(cdc.balanceOf(user), 100 ether);
     }
@@ -135,9 +139,9 @@ contract CdcExchangeTest is DSTest, DSMath, CdcExchangeEvents {
         // ETH balance have to be correct
         assertEq(address(this).balance, add(current_balance, sentEth));
         assertEq(address(user).balance, sub(user_current_balance, sentEth));
-        // DPT have to be burned
+        // DPT fee have to be transfered to crematorium
         assertEq(dpt.balanceOf(user), 0);
-        assertEq(dpt.totalSupply(), sub(Cdc_SUPPLY, fee));
+        assertEq(dpt.balanceOf(crematorium), fee);
         // 100 CDC have to transfered to user
         assertEq(cdc.balanceOf(user), 100 ether);
     }
@@ -159,9 +163,9 @@ contract CdcExchangeTest is DSTest, DSMath, CdcExchangeEvents {
         // ETH balance have to be correct
         assertEq(address(this).balance, add(current_balance, sentEth));
         assertEq(address(user).balance, sub(user_current_balance, sentEth));
-        // DPT have to be burned => 0.5 have to be taken from user and 0.5 from seller
+        // DPT have to be transfered to crematorium => 0.5 have to be taken from user and 0.5 from seller
         assertEq(dpt.balanceOf(user), 0);
-        assertEq(dpt.totalSupply(), sub(Cdc_SUPPLY, fee));
+        assertEq(dpt.balanceOf(crematorium), fee);
         // 100 CDC have to transfered to user
         assertEq(cdc.balanceOf(user), 100 ether);
     }
