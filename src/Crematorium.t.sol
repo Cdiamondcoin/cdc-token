@@ -43,4 +43,12 @@ contract CrematoriumTest is DSTest {
         creamatorioum.burnAll();
         assertEq(token.totalSupply(), initialBalance - sentAmount);
     }
+
+    function testResurrect() public {
+        uint sentAmount = 250;
+        token.transfer(creamatorioum, sentAmount);
+        creamatorioum.resurrect(sentAmount);
+        assertEq(token.totalSupply(), initialBalance);
+        assertEq(token.balanceOf(creamatorioum.owner()), initialBalance);
+    }
 }

@@ -24,4 +24,8 @@ contract Crematorium is DSAuth {
         uint totalAmount = token.balanceOf(address(this));
         burn(totalAmount);
     }
+
+    function resurrect(uint amount_) public auth {
+        token.transfer(owner, amount_);
+    }
 }
