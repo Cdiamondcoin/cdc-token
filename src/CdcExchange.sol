@@ -18,9 +18,7 @@ contract MedianizerLike {
 * @dev Contract to calculating fee by user and sended amount
 */
 contract CdcFinance {
-    function calculateFee(
-        address sender, uint value
-    ) public view returns (uint);
+    function calculateFee(address sender, uint value) external view returns (uint);
 }
 
 /**
@@ -44,8 +42,8 @@ contract CdcExchangeEvents {
         uint fee
     );
     event LogBuyDptFee(address sender, uint ethValue, uint rate, uint fee);
+
     event LogDptSellerChange(address dptSeller);
-    event LogSetCfo(address cfo);
     event LogSetFee(uint fee);
 
     event LogSetEthUsdRate(uint rate);
@@ -59,6 +57,7 @@ contract CdcExchangeEvents {
     event LogSetEthPriceFeed(address priceFeed);
     event LogSetDptPriceFeed(address priceFeed);
     event LogSetCdcPriceFeed(address priceFeed);
+    event LogSetCfo(address cfo);
 }
 
 contract CdcExchange is DSAuth, DSStop, DSMath, CdcExchangeEvents {
@@ -75,7 +74,7 @@ contract CdcExchange is DSAuth, DSStop, DSMath, CdcExchangeEvents {
     bool public manualDptRate = true;       //allow to use/set manually setted CDC/USD rate
     bool public manualCdcRate = true;       //allow to use/set manually setted CDC/USD rate
 
-    uint public fee = 0.015 ether;          //fee in USD on buying CDC
+    uint public fee = 0.5 ether;            //fee in USD on buying CDC
     CdcFinance public cfo;                  //CFO of CDC contract
 
     address public dptSeller;               //from this address user buy DPT fee
@@ -116,23 +115,26 @@ contract CdcExchange is DSAuth, DSStop, DSMath, CdcExchangeEvents {
         // Getting rates from price feeds
         updateRates();
 
+        uint ethAmountToBuyCdc = msg.value;
         // Get fee in USD
         fee = calculateFee(msg.sender, msg.value);
-        // Convert to DPT
-        uint feeInDpt = wdiv(fee, dptUsdRate);
-        // Take fee in DPT from user balance
-        feeInDpt = takeFeeInDptFromUser(msg.sender, feeInDpt);
 
-        uint ethAmountToBuyCdc = msg.value;
+        // TODO: move to function?
+        if (fee > 0) {
+            // Convert to DPT
+            uint feeInDpt = wdiv(fee, dptUsdRate);
+            // Take fee in DPT from user balance
+            feeInDpt = takeFeeInDptFromUser(msg.sender, feeInDpt);
 
-        // insufficient funds of DPT => user has to buy remained fee by ETH
-        if (feeInDpt > 0) {
-            uint feeEth = buyDptFee(wmul(feeInDpt, dptUsdRate));
-            ethAmountToBuyCdc = sub(ethAmountToBuyCdc, feeEth);
+            // insufficient funds of DPT => user has to buy remained fee by ETH
+            if (feeInDpt > 0) {
+                uint feeEth = buyDptFee(wmul(feeInDpt, dptUsdRate));
+                ethAmountToBuyCdc = sub(ethAmountToBuyCdc, feeEth);
+            }
+
+            // "burn" DPT fee
+            dpt.transfer(crematorium, fee);
         }
-
-        // "burn" DPT fee
-        dpt.transfer(crematorium, fee);
 
         // send CDC to user
         tokens = sellCdc(msg.sender, ethAmountToBuyCdc);
@@ -145,7 +147,7 @@ contract CdcExchange is DSAuth, DSStop, DSMath, CdcExchangeEvents {
     * @dev Ability to delegate fee calculating to external contract.
     * @return the fee amount in USD
     */
-    function calculateFee(address sender, uint value) internal view returns (uint) {
+    function calculateFee(address sender, uint value) public view returns (uint) {
         if (cfo == CdcFinance(0)) {
             return fee;
         } else {
@@ -167,7 +169,7 @@ contract CdcExchange is DSAuth, DSStop, DSMath, CdcExchangeEvents {
     function setEthPriceFeed(address ethPriceFeed_) public auth {
         require(ethPriceFeed_ != 0x0, "Wrong PriceFeed address");
         ethPriceFeed = MedianizerLike(ethPriceFeed_);
-        emit LogSetEthPriceFeed(address(ethPriceFeed));
+        emit LogSetEthPriceFeed(ethPriceFeed);
     }
 
     /**
@@ -176,7 +178,7 @@ contract CdcExchange is DSAuth, DSStop, DSMath, CdcExchangeEvents {
     function setDptPriceFeed(address dptPriceFeed_) public auth {
         require(dptPriceFeed_ != 0x0, "Wrong PriceFeed address");
         dptPriceFeed = MedianizerLike(dptPriceFeed_);
-        emit LogSetDptPriceFeed(address(dptPriceFeed));
+        emit LogSetDptPriceFeed(dptPriceFeed);
     }
 
     /**
@@ -185,13 +187,15 @@ contract CdcExchange is DSAuth, DSStop, DSMath, CdcExchangeEvents {
     function setCdcPriceFeed(address cdcPriceFeed_) public auth {
         require(cdcPriceFeed_ != 0x0, "Wrong PriceFeed address");
         cdcPriceFeed = MedianizerLike(cdcPriceFeed_);
-        emit LogSetCdcPriceFeed(address(cdcPriceFeed));
+        emit LogSetCdcPriceFeed(cdcPriceFeed);
     }
 
     /**
-    * @dev Set the DPT seller
+    * @dev Set the DPT seller with balance > 0
     */
     function setDptSeller(address dptSeller_) public auth {
+        require(dptSeller_ != 0x0, "Wrong address");
+        require(dpt.balanceOf(dptSeller_) > 0, "Insufficient funds of DPT");
         dptSeller = dptSeller_;
         emit LogDptSellerChange(dptSeller);
     }
@@ -219,22 +223,26 @@ contract CdcExchange is DSAuth, DSStop, DSMath, CdcExchangeEvents {
         emit LogSetManualEthRate(manualEthRate);
     }
 
-    function setCfo(CdcFinance cfo_) public auth {
-        cfo = cfo_;
-        emit LogSetCfo(address(cfo));
+    function setCfo(address cfo_) public auth {
+        require(cfo_ != 0x0, "Wrong address");
+        cfo = CdcFinance(cfo_);
+        emit LogSetCfo(cfo);
     }
 
     function setDptUsdRate(uint dptUsdRate_) public auth {
+        require(dptUsdRate_ > 0, "Rate have to be larger than 0");
         dptUsdRate = dptUsdRate_;
         emit LogSetDptUsdRate(dptUsdRate);
     }
 
     function setCdcUsdRate(uint cdcUsdRate_) public auth {
+        require(cdcUsdRate_ > 0, "Rate have to be larger than 0");
         cdcUsdRate = cdcUsdRate_;
         emit LogSetCdcUsdRate(cdcUsdRate);
     }
 
     function setEthUsdRate(uint ethUsdRate_) public auth {
+        require(ethUsdRate_ > 0, "Rate have to be larger than 0");
         ethUsdRate = ethUsdRate_;
         emit LogSetEthUsdRate(ethUsdRate);
     }
@@ -291,7 +299,7 @@ contract CdcExchange is DSAuth, DSStop, DSMath, CdcExchangeEvents {
         bytes32 cdcUsdRateBytes;
 
         // receive DPT/USD price
-        (cdcUsdRateBytes, feedValid) = dptPriceFeed.peek();
+        (cdcUsdRateBytes, feedValid) = cdcPriceFeed.peek();
 
         // if feed is valid, load DPT/USD rate from it
         if (feedValid) {

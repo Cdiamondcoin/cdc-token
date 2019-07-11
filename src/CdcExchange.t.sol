@@ -7,21 +7,18 @@ import "./Cdc.sol";
 import "./CdcExchange.sol";
 import "./Crematorium.sol";
 
-// contract Dpt is DSToken {
-//     constructor() DSToken('DPT') public {
-//         uint totalSupply_ = (10 ** 7) * (10 ** 18);
-//         super.mint(totalSupply_);
-//         transfer(owner, totalSupply_);
-//     }
 
-//     // copied from DPT production token
-//     function burn(address _who, uint256 _value) public {
-//         require(_value <= _balances[_who], "dpt-token-insufficient-balance");
+contract TestCdcFinance {
+    uint fee;
 
-//         _balances[_who] = sub(_balances[_who], _value);
-//         _supply = sub(_supply, _value);
-//     }
-// }
+    function calculateFee(address sender, uint value) external view returns (uint) {
+        return fee;
+    }
+
+    function setFee(uint fee_) public {
+        fee = fee_;
+    }
+}
 
 contract TestMedianizerLike {
     bytes32 public rate;
@@ -62,12 +59,56 @@ contract CdcExchangeTester {
         _dpt.approve(to, amount);
     }
 
+    function doSetFee(uint fee_) public {
+        _exchange.setFee(fee_);
+    }
+
+    function doSetEthPriceFeed(address feed) public {
+        _exchange.setEthPriceFeed(feed);
+    }
+
+    function doSetDptPriceFeed(address feed) public {
+        _exchange.setDptPriceFeed(feed);
+    }
+
+    function doSetDptSeller(address seller) public {
+        _exchange.setDptSeller(seller);
+    }
+
+    function doSetManualDptRate(bool value) public {
+        _exchange.setManualDptRate(value);
+    }
+
+    function doSetManualCdcRate(bool value) public {
+        _exchange.setManualCdcRate(value);
+    }
+
+    function doSetManualEthRate(bool value) public {
+        _exchange.setManualEthRate(value);
+    }
+
+    function doSetDptUsdRate(uint rate) public {
+        _exchange.setDptUsdRate(rate);
+    }
+
+    function doSetCdcUsdRate(uint rate) public {
+        _exchange.setCdcUsdRate(rate);
+    }
+
+    function doSetEthUsdRate(uint rate) public {
+        _exchange.setEthUsdRate(rate);
+    }
+
+    function doSetCfo(address cfo) public {
+        _exchange.setCfo(cfo);
+    }
+
     function () external payable {
     }
 }
 
 contract CdcExchangeTest is DSTest, DSMath, CdcExchangeEvents {
-    uint constant Cdc_SUPPLY = (10 ** 7) * (10 ** 18);
+    uint constant CDC_SUPPLY = (10 ** 7) * (10 ** 18);
 
     Cdc cdc;
     DSToken dpt;
@@ -80,6 +121,7 @@ contract CdcExchangeTest is DSTest, DSMath, CdcExchangeEvents {
     TestMedianizerLike cdcPriceFeed;
 
     Crematorium crematorium;
+    TestCdcFinance cfo;
 
     uint etherBalance;
     uint sendEth;
@@ -88,6 +130,8 @@ contract CdcExchangeTest is DSTest, DSMath, CdcExchangeEvents {
     function setUp() public {
         cdc = new Cdc();
         dpt = new DSToken("DPT");
+        dpt.mint(CDC_SUPPLY);
+
         ethPriceFeed = new TestMedianizerLike(300 ether, true);
         dptPriceFeed = new TestMedianizerLike(3 ether, true);
         cdcPriceFeed = new TestMedianizerLike(30 ether, true);
@@ -95,11 +139,11 @@ contract CdcExchangeTest is DSTest, DSMath, CdcExchangeEvents {
         crematorium = new Crematorium(dpt);
         exchange = new CdcExchange(cdc, dpt, ethPriceFeed, dptPriceFeed, cdcPriceFeed, address(this), crematorium);
         user = new CdcExchangeTester(exchange, dpt);
+        cfo = new TestCdcFinance();
+
         cdc.approve(exchange, uint(-1));
         dpt.approve(exchange, uint(-1));
-        require(cdc.balanceOf(this) == Cdc_SUPPLY);
-        require(dpt.balanceOf(this) == Cdc_SUPPLY);
-        require(address(this).balance >= 1000 ether);
+
         address(user).transfer(1000 ether);
         etherBalance = address(this).balance;
     }
@@ -107,32 +151,172 @@ contract CdcExchangeTest is DSTest, DSMath, CdcExchangeEvents {
     function () external payable {
     }
 
-    // function testSetEthCdcRate() public {
-    //     exchange.setEthCdcRate(ethCdcRate);
-    //     assertEq(exchange.ethCdcRate(), ethCdcRate);
-    // }
+    // Here place tests for buyTokensWithFee
 
-    // function testSetFee() public {
-    //     uint fee = 0.01 ether;
-    //     exchange.setFee(fee);
-    //     assertEq(exchange.fee(), fee);
-    // }
+    function testCalculateFee() public {
+        // By default fee should be equal to init value
+        assertEq(exchange.calculateFee(address(this), 1 ether), exchange.fee());
+    }
 
-    // function testSetPriceFeed() public {
-    //     MedianizerLike newFeed = new MedianizerLike(0.01 ether, true);
-    //     exchange.setPriceFeed(newFeed);
-    //     assertEq(exchange.priceFeed(), newFeed);
-    // }
+    function testSetFee() public {
+        uint newFee = 0.1 ether;
+        exchange.setFee(newFee);
+        assertEq(exchange.fee(), newFee);
+    }
 
-    // function testSetDptSeller() public {
-    //     exchange.setDptSeller(user);
-    //     assertEq(exchange.dptSeller(), user);
-    // }
+    function testFailNonOwnerSetFee() public {
+        uint newFee = 0.1 ether;
+        user.doSetFee(newFee);
+    }
 
-    // function testSetManualDptRate() public {
-    //     exchange.setManualDptRate(false);
-    //     assertTrue(!exchange.manualDptRate());
-    // }
+    function testSetEthPriceFeed() public {
+        exchange.setEthPriceFeed(address(this));
+        assertEq(exchange.ethPriceFeed(), address(this));
+    }
+
+    function testFailWrongAddressSetEthPriceFeed() public {
+        exchange.setEthPriceFeed(address(0));
+    }
+
+    function testFailNonOwnerSetEthPriceFeed() public {
+        user.doSetEthPriceFeed(address(this));
+    }
+
+    function testSetDptPriceFeed() public {
+        exchange.setDptPriceFeed(address(this));
+        assertEq(exchange.dptPriceFeed(), address(this));
+    }
+
+    function testFailWrongAddressSetDptPriceFeed() public {
+        exchange.setDptPriceFeed(address(0));
+    }
+
+    function testFailNonOwnerSetDptPriceFeed() public {
+        user.doSetDptPriceFeed(address(this));
+    }
+
+    function testSetDptSeller() public {
+        dpt.transfer(address(user), 100 ether);
+        exchange.setDptSeller(address(user));
+        assertEq(exchange.dptSeller(), address(user));
+    }
+
+    function testFailWrongAddressSetDptSeller() public {
+        exchange.setDptSeller(address(0));
+    }
+
+    function testFailNonOwnerSetDptSeller() public {
+        dpt.transfer(address(user), 100 ether);
+        user.doSetDptSeller(address(user));
+    }
+
+    function testSetManualDptRate() public {
+        exchange.setManualDptRate(false);
+        assertTrue(!exchange.manualDptRate());
+    }
+
+    function testFailNonOwnerSetManualDptRate() public {
+        user.doSetManualDptRate(false);
+    }
+
+    function testSetManualCdcRate() public {
+        exchange.setManualCdcRate(false);
+        assertTrue(!exchange.manualCdcRate());
+    }
+
+    function testFailNonOwnerSetManualCdcRate() public {
+        user.doSetManualCdcRate(false);
+    }
+
+    function testSetManualEthRate() public {
+        exchange.setManualEthRate(false);
+        assertTrue(!exchange.manualEthRate());
+    }
+
+    function testFailNonOwnerSetManualEthRate() public {
+        user.doSetManualEthRate(false);
+    }
+
+    function testSetCfo() public {
+        exchange.setCfo(address(cfo));
+    }
+
+    function testFailWrongAddressSetCfo() public {
+        exchange.setCfo(address(0));
+    }
+
+    function testFailNonOwnerSetCfo() public {
+        user.doSetCfo(address(user));
+    }
+
+    function testSetDptUsdRate() public {
+        uint newRate = 5 ether;
+        exchange.setDptUsdRate(newRate);
+        assertEq(exchange.dptUsdRate(), newRate);
+    }
+
+    function testFailIncorectRateSetDptUsdRate() public {
+        exchange.setDptUsdRate(0);
+    }
+
+    function testFailNonOwnerSetDptUsdRate() public {
+        uint newRate = 5 ether;
+        user.doSetDptUsdRate(newRate);
+    }
+
+    function testSetCdcUsdRate() public {
+        uint newRate = 5 ether;
+        exchange.setCdcUsdRate(newRate);
+        assertEq(exchange.cdcUsdRate(), newRate);
+    }
+
+    function testFailIncorectRateSetCdcUsdRate() public {
+        exchange.setCdcUsdRate(0);
+    }
+
+    function testFailNonOwnerSetCdcUsdRate() public {
+        uint newRate = 5 ether;
+        user.doSetCdcUsdRate(newRate);
+    }
+
+    function testSetEthUsdRate() public {
+        uint newRate = 5 ether;
+        exchange.setEthUsdRate(newRate);
+        assertEq(exchange.ethUsdRate(), newRate);
+    }
+
+    function testFailIncorectRateSetEthUsdRate() public {
+        exchange.setEthUsdRate(0);
+    }
+
+    function testFailNonOwnerSetEthUsdRate() public {
+        uint newRate = 5 ether;
+        user.doSetEthUsdRate(newRate);
+    }
+
+    function testFailInvalidEthFeedAndManualDisabledBuyTokensWithFee() public {
+        uint sentEth = 1 ether;
+
+        exchange.setManualEthRate(false);
+        ethPriceFeed.setValid(false);
+        user.doBuyTokensWithFee(sentEth);
+    }
+
+    function testFailInvalidDptFeedAndManualDisabledBuyTokensWithFee() public {
+        uint sentEth = 1 ether;
+
+        exchange.setManualDptRate(false);
+        dptPriceFeed.setValid(false);
+        user.doBuyTokensWithFee(sentEth);
+    }
+
+    function testFailInvalidCdcFeedAndManualDisabledBuyTokensWithFee() public {
+        uint sentEth = 1 ether;
+
+        exchange.setManualCdcRate(false);
+        cdcPriceFeed.setValid(false);
+        user.doBuyTokensWithFee(sentEth);
+    }
 
     // function testBuyTokensWithFee() public {
     //     uint current_balance = address(this).balance;
@@ -148,7 +332,7 @@ contract CdcExchangeTest is DSTest, DSMath, CdcExchangeEvents {
     //     assertEq(address(this).balance, add(current_balance, sentEth));
     //     assertEq(address(user).balance, sub(user_current_balance, sentEth));
     //     // DPT fee have to be transfered to crematorium
-    //     assertEq(dpt.balanceOf(this), sub(Cdc_SUPPLY, fee));
+    //     assertEq(dpt.balanceOf(this), sub(CDC_SUPPLY, fee));
     //     assertEq(dpt.balanceOf(crematorium), fee);
     //     // 100 CDC have to transfered to user
     //     assertEq(cdc.balanceOf(user), 100 ether);
