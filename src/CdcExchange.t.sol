@@ -42,6 +42,21 @@ contract TestMedianizerLike {
     }
 }
 
+contract DptTester {
+    DSToken public _dpt;
+
+    constructor(DSToken dpt) public {
+        _dpt = dpt;
+    }
+
+    function doApprove(address to, uint amount) public {
+        _dpt.approve(to, amount);
+    }
+
+    function () external payable {
+    }
+}
+
 contract CdcExchangeTester {
     CdcExchange public _exchange;
     DSToken public _dpt;
@@ -109,11 +124,13 @@ contract CdcExchangeTester {
 
 contract CdcExchangeTest is DSTest, DSMath, CdcExchangeEvents {
     uint constant CDC_SUPPLY = (10 ** 7) * (10 ** 18);
+    uint constant INITIAL_BALANCE = 1000 ether;
 
     Cdc cdc;
     DSToken dpt;
     CdcExchange exchange;
 
+    DptTester dptSeller;
     CdcExchangeTester user;
 
     TestMedianizerLike ethPriceFeed;
@@ -123,35 +140,46 @@ contract CdcExchangeTest is DSTest, DSMath, CdcExchangeEvents {
     Crematorium crematorium;
     TestCdcFinance cfo;
 
-    uint etherBalance;
-    uint sendEth;
-    uint ethCdcRate = 30 ether;
+    // test variables
+    uint ownerBalance;
+    uint userBalance;
+    uint dptSellerBalance;
+
+    uint fee = 3 ether; // USD
+    uint ethUsdRate = 300 ether;
+    uint dptUsdRate = 3 ether;
+    uint cdcUsdRate = 30 ether;
 
     function setUp() public {
         cdc = new Cdc();
         dpt = new DSToken("DPT");
         dpt.mint(CDC_SUPPLY);
 
-        ethPriceFeed = new TestMedianizerLike(300 ether, true);
-        dptPriceFeed = new TestMedianizerLike(3 ether, true);
-        cdcPriceFeed = new TestMedianizerLike(30 ether, true);
+        ethPriceFeed = new TestMedianizerLike(ethUsdRate, true);
+        dptPriceFeed = new TestMedianizerLike(dptUsdRate, true);
+        cdcPriceFeed = new TestMedianizerLike(cdcUsdRate, true);
 
         crematorium = new Crematorium(dpt);
-        exchange = new CdcExchange(cdc, dpt, ethPriceFeed, dptPriceFeed, cdcPriceFeed, address(this), crematorium);
+        dptSeller = new DptTester(dpt);
+        exchange = new CdcExchange(cdc, dpt, ethPriceFeed, dptPriceFeed, cdcPriceFeed, dptSeller, crematorium);
         user = new CdcExchangeTester(exchange, dpt);
         cfo = new TestCdcFinance();
 
         cdc.approve(exchange, uint(-1));
         dpt.approve(exchange, uint(-1));
+        // Prepare seller of DPT fees
+        dpt.transfer(dptSeller, INITIAL_BALANCE);
+        dptSeller.doApprove(exchange, uint(-1));
 
-        address(user).transfer(1000 ether);
-        etherBalance = address(this).balance;
+        address(user).transfer(INITIAL_BALANCE);
+
+        ownerBalance = address(this).balance;
+        userBalance = address(user).balance;
+        dptSellerBalance = address(dptSeller).balance;
     }
 
     function () external payable {
     }
-
-    // Here place tests for buyTokensWithFee
 
     function testCalculateFee() public {
         // By default fee should be equal to init value
@@ -318,78 +346,93 @@ contract CdcExchangeTest is DSTest, DSMath, CdcExchangeEvents {
         user.doBuyTokensWithFee(sentEth);
     }
 
-    // function testBuyTokensWithFee() public {
-    //     uint current_balance = address(this).balance;
-    //     uint user_current_balance = address(user).balance;
-    //     uint fee = 1 ether;
-    //     uint sentEth = 1.01 ether;
+    /**
+    * @dev User does not has any DPT and send only ETH and get CDC
+    */
+    function testBuyTokensWithFee() public {
+        uint sentEth = 1 ether;
+        exchange.setFee(fee);
 
-    //     exchange.setEthCdcRate(100 ether);
-    //     exchange.setFee(fee);
+        user.doBuyTokensWithFee(sentEth);
 
-    //     user.doBuyTokensWithFee(sentEth);
-    //     // ETH balance have to be correct
-    //     assertEq(address(this).balance, add(current_balance, sentEth));
-    //     assertEq(address(user).balance, sub(user_current_balance, sentEth));
-    //     // DPT fee have to be transfered to crematorium
-    //     assertEq(dpt.balanceOf(this), sub(CDC_SUPPLY, fee));
-    //     assertEq(dpt.balanceOf(crematorium), fee);
-    //     // 100 CDC have to transfered to user
-    //     assertEq(cdc.balanceOf(user), 100 ether);
-    // }
+        uint feeInDpt = wdiv(fee, dptUsdRate);
+        uint feeInEth = wdiv(fee, ethUsdRate);
+        // DPT (eq fee in USD) must be sold from dptSeller balance
+        assertEq(dpt.balanceOf(address(dptSeller)), sub(INITIAL_BALANCE, feeInDpt));
+        // DPT fee have to be transfered to crematorium
+        assertEq(dpt.balanceOf(crematorium), feeInDpt);
 
-    // function testBuyTokensWithFeeUserHasDpt() public {
-    //     uint current_balance = address(this).balance;
-    //     uint user_current_balance = address(user).balance;
-    //     uint fee = 1 ether;
-    //     uint sentEth = 1 ether;
+        // ETH (minus ETH for DPT fee) must be sent to owner balance from user balance
+        assertEq(address(this).balance, add(ownerBalance, sub(sentEth, feeInEth)));
+        // ETH for DPT fee must be sent to dptSeller balance from user balance
+        assertEq(address(dptSeller).balance, add(dptSellerBalance, feeInEth));
+        // ETH on user balance
+        assertEq(address(user).balance, sub(userBalance, sentEth));
 
-    //     exchange.setEthCdcRate(100 ether);
-    //     exchange.setFee(fee);
+        // CDC must be transfered to user
+        assertEq(cdc.balanceOf(user), 9.9 ether);
+    }
 
-    //     dpt.push(user, fee);
-    //     user.doDptApprove(exchange, fee);
+    /**
+    * @dev User has DPT. Send ETH and get CDC for all amount of ETH and minus fee on DPT balance
+    */
+    function testBuyTokensWithFeeUserHasDpt() public {
+        uint sentEth = 1 ether;
+        exchange.setFee(fee);
 
-    //     user.doBuyTokensWithFee(sentEth);
-    //     // ETH balance have to be correct
-    //     assertEq(address(this).balance, add(current_balance, sentEth));
-    //     assertEq(address(user).balance, sub(user_current_balance, sentEth));
-    //     // DPT fee have to be transfered to crematorium
-    //     assertEq(dpt.balanceOf(user), 0);
-    //     assertEq(dpt.balanceOf(crematorium), fee);
-    //     // 100 CDC have to transfered to user
-    //     assertEq(cdc.balanceOf(user), 100 ether);
-    // }
+        // setup user dpt balance
+        dpt.transfer(user, INITIAL_BALANCE);
+        user.doDptApprove(exchange, uint(-1));
 
-    // function testBuyTokensWithFeeUserHasHalfOfDpt() public {
-    //     uint current_balance = address(this).balance;
-    //     uint user_current_balance = address(user).balance;
-    //     uint fee = 2 ether;
-    //     uint user_dpt_amount = 1 ether;
-    //     uint sentEth = 1.01 ether;
+        user.doBuyTokensWithFee(sentEth);
 
-    //     exchange.setEthCdcRate(100 ether);
-    //     exchange.setFee(fee);
+        uint feeInDpt = wdiv(fee, dptUsdRate);
+        // DPT balance of dptSeller must be untouched
+        assertEq(dpt.balanceOf(address(dptSeller)), INITIAL_BALANCE);
+        // DPT fee have to be transfered to crematorium from user
+        assertEq(dpt.balanceOf(crematorium), feeInDpt);
+        assertEq(dpt.balanceOf(user), sub(INITIAL_BALANCE, feeInDpt));
 
-    //     dpt.push(user, user_dpt_amount);
-    //     user.doDptApprove(exchange, user_dpt_amount);
+        // ETH must be sent to owner balance from user balance
+        assertEq(address(this).balance, add(ownerBalance, sentEth));
+        // ETH on user balance
+        assertEq(address(user).balance, sub(userBalance, sentEth));
 
-    //     user.doBuyTokensWithFee(sentEth);
-    //     // ETH balance have to be correct
-    //     assertEq(address(this).balance, add(current_balance, sentEth));
-    //     assertEq(address(user).balance, sub(user_current_balance, sentEth));
-    //     // DPT have to be transfered to crematorium => 0.5 have to be taken from user and 0.5 from seller
-    //     assertEq(dpt.balanceOf(user), 0);
-    //     assertEq(dpt.balanceOf(crematorium), fee);
-    //     // 100 CDC have to transfered to user
-    //     assertEq(cdc.balanceOf(user), 100 ether);
-    // }
+        // CDC must be transfered to user
+        assertEq(cdc.balanceOf(user), 10 ether);
+    }
 
-    // function testFailBuyTokensWithFeeDueInvalidFeed() public {
-    //     uint sentEth = 1.01 ether;
+    /**
+    * @dev User has DPT but less than fee. Send ETH, get CDC, buy remained DPT fee
+    */
+    function testBuyTokensWithFeeUserHasInsufficientlyDpt() public {
+        uint sentEth = 1 ether;
+        uint userDptBalance = 0.5 ether;
+        exchange.setFee(fee);
 
-    //     feed.setValid(false);
-    //     exchange.setManualDptRate(false);
-    //     user.doBuyTokensWithFee(sentEth);
-    // }
+        // setup user dpt balance
+        dpt.transfer(user, userDptBalance);
+        user.doDptApprove(exchange, uint(-1));
+
+        user.doBuyTokensWithFee(sentEth);
+
+        uint feeInDpt = wdiv(fee, dptUsdRate);
+        // DPT must be sold from dptSeller balance
+        assertEq(dpt.balanceOf(address(dptSeller)), sub(INITIAL_BALANCE, sub(feeInDpt, userDptBalance)));
+        // DPT fee have to be transfered to crematorium
+        assertEq(dpt.balanceOf(crematorium), feeInDpt);
+        assertEq(dpt.balanceOf(user), 0);
+
+        uint buyableFeeInUsd = wmul(sub(feeInDpt, userDptBalance), dptUsdRate);
+        uint buyableFeeInEth = wdiv(buyableFeeInUsd, ethUsdRate);
+        // ETH must be sent to owner balance from user balance
+        assertEq(address(this).balance, add(ownerBalance, sub(sentEth, buyableFeeInEth)));
+        // ETH for DPT fee must be sent to dptSeller
+        assertEq(address(dptSeller).balance, add(dptSellerBalance, buyableFeeInEth));
+        // ETH on user balance
+        assertEq(address(user).balance, sub(userBalance, sentEth));
+
+        // CDC must be transfered to user
+        assertEq(cdc.balanceOf(user), 9.95 ether);
+    }
 }

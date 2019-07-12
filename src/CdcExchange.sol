@@ -41,7 +41,7 @@ contract CdcExchangeEvents {
         uint rate,
         uint fee
     );
-    event LogBuyDptFee(address sender, uint ethValue, uint rate, uint fee);
+    event LogBuyDptFee(address sender, uint ethValue, uint ethUsdRate, uint dptUsdRate, uint fee);
 
     event LogDptSellerChange(address dptSeller);
     event LogSetFee(uint fee);
@@ -124,16 +124,16 @@ contract CdcExchange is DSAuth, DSStop, DSMath, CdcExchangeEvents {
             // Convert to DPT
             uint feeInDpt = wdiv(fee, dptUsdRate);
             // Take fee in DPT from user balance
-            feeInDpt = takeFeeInDptFromUser(msg.sender, feeInDpt);
+            uint remainedFeeInDpt = takeFeeInDptFromUser(msg.sender, feeInDpt);
 
             // insufficient funds of DPT => user has to buy remained fee by ETH
-            if (feeInDpt > 0) {
-                uint feeEth = buyDptFee(wmul(feeInDpt, dptUsdRate));
+            if (remainedFeeInDpt > 0) {
+                uint feeEth = buyDptFee(remainedFeeInDpt);
                 ethAmountToBuyCdc = sub(ethAmountToBuyCdc, feeEth);
             }
 
             // "burn" DPT fee
-            dpt.transfer(crematorium, fee);
+            dpt.transfer(crematorium, feeInDpt);
         }
 
         // send CDC to user
@@ -251,7 +251,7 @@ contract CdcExchange is DSAuth, DSStop, DSMath, CdcExchangeEvents {
     // internals functions
 
     /**
-    * @dev Get ETH/USD rate from priceFeed.
+    * @dev Get ETH/USD rate from priceFeed or if allowed manually setted ethUsdRate
     * Revert transaction if not valid feed and manual value not allowed
     */
     function updateEthUsdRate() internal {
@@ -271,7 +271,7 @@ contract CdcExchange is DSAuth, DSStop, DSMath, CdcExchangeEvents {
     }
 
     /**
-    * @dev Get DPT/USD rate from priceFeed.
+    * @dev Get DPT/USD rate from priceFeed or if allowed manually setted dptUsdRate
     * Revert transaction if not valid feed and manual value not allowed
     */
     function updateDptUsdRate() internal {
@@ -291,7 +291,7 @@ contract CdcExchange is DSAuth, DSStop, DSMath, CdcExchangeEvents {
     }
 
     /**
-    * @dev Get CDC/USD rate from priceFeed.
+    * @dev Get CDC/USD rate from priceFeed or if allowed manually setted cdcUsdRate
     * Revert transaction if not valid feed and manual value not allowed
     */
     function updateCdcUsdRate() internal {
@@ -317,19 +317,19 @@ contract CdcExchange is DSAuth, DSStop, DSMath, CdcExchangeEvents {
     }
 
     /**
-    * @dev User buy fee_ in DPT by ETH with actual ETH/USD rate from dptSeller.
-    * @param fee_ the fee in USD
+    * @dev User buy fee from dptSeller in DPT by ETH with actual DPT/USD and ETH/USD rate.
     * @return the amount of sold fee in ETH
     */
-    function buyDptFee(uint fee_) internal returns (uint ethAmount) {
+    function buyDptFee(uint feeInDpt) internal returns (uint ethAmount) {
+        uint feeInUsd = wmul(feeInDpt, dptUsdRate);
         // calculate fee in ETH
-        ethAmount = wdiv(fee_, ethUsdRate);
+        ethAmount = wdiv(feeInUsd, ethUsdRate);
         // user pays for fee
         address(dptSeller).transfer(ethAmount);
         // transfer bought fee to contract, this fee will be burned
-        dpt.transferFrom(dptSeller, address(this), fee_);
+        dpt.transferFrom(dptSeller, address(this), feeInDpt);
 
-        emit LogBuyDptFee(msg.sender, ethAmount, ethUsdRate, fee_);
+        emit LogBuyDptFee(msg.sender, ethAmount, ethUsdRate, dptUsdRate, feeInUsd);
         return ethAmount;
     }
 
