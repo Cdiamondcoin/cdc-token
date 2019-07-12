@@ -67,9 +67,11 @@ contract CdcExchange is DSAuth, DSStop, DSMath, CdcExchangeEvents {
     MedianizerLike public ethPriceFeed;     //address of the ETH/USD price feed
     MedianizerLike public dptPriceFeed;     //address of the DPT/USD price feed
     MedianizerLike public cdcPriceFeed;     //address of the CDC/USD price feed
-    uint public dptUsdRate;                 //how many USD 1 DPT cost. 18 digit precision
-    uint public cdcUsdRate;                 //how many USD 1 CDC cost. 18 digit precision
-    uint public ethUsdRate;                 //how many USD 1 ETH cost. 18 digit precision
+
+    // TODO: move rates to deploy script or to the constructor?
+    uint public dptUsdRate = 3 ether;       //how many USD 1 DPT cost. 18 digit precision
+    uint public cdcUsdRate = 30 ether;      //how many USD 1 CDC cost. 18 digit precision
+    uint public ethUsdRate = 300 ether;     //how many USD 1 ETH cost. 18 digit precision
     bool public manualEthRate = true;       //allow to use/set manually setted DPT/USD rate
     bool public manualDptRate = true;       //allow to use/set manually setted CDC/USD rate
     bool public manualCdcRate = true;       //allow to use/set manually setted CDC/USD rate

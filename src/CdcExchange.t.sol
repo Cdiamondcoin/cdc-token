@@ -53,6 +53,10 @@ contract DptTester {
         _dpt.approve(to, amount);
     }
 
+    function doTransfer(address to, uint amount) public {
+        _dpt.transfer(to, amount);
+    }
+
     function () external payable {
     }
 }
@@ -162,6 +166,7 @@ contract CdcExchangeTest is DSTest, DSMath, CdcExchangeEvents {
         crematorium = new Crematorium(dpt);
         dptSeller = new DptTester(dpt);
         exchange = new CdcExchange(cdc, dpt, ethPriceFeed, dptPriceFeed, cdcPriceFeed, dptSeller, crematorium);
+        exchange.setFee(fee);
         user = new CdcExchangeTester(exchange, dpt);
         cfo = new TestCdcFinance();
 
@@ -370,7 +375,7 @@ contract CdcExchangeTest is DSTest, DSMath, CdcExchangeEvents {
         assertEq(address(user).balance, sub(userBalance, sentEth));
 
         // CDC must be transfered to user
-        assertEq(cdc.balanceOf(user), 9.9 ether);
+        assertEq(cdc.balanceOf(user), wdiv(sub(wmul(sentEth, ethUsdRate), fee), cdcUsdRate));
     }
 
     /**
@@ -399,7 +404,7 @@ contract CdcExchangeTest is DSTest, DSMath, CdcExchangeEvents {
         assertEq(address(user).balance, sub(userBalance, sentEth));
 
         // CDC must be transfered to user
-        assertEq(cdc.balanceOf(user), 10 ether);
+        assertEq(cdc.balanceOf(user), wdiv(wmul(sentEth, ethUsdRate), cdcUsdRate));
     }
 
     /**
@@ -434,5 +439,104 @@ contract CdcExchangeTest is DSTest, DSMath, CdcExchangeEvents {
 
         // CDC must be transfered to user
         assertEq(cdc.balanceOf(user), 9.95 ether);
+    }
+
+    /**
+    * @dev DptSeller has insufficient amount of DPT
+    * User send ETH and must get money back
+    */
+    function testFailBuyTokensWithFeeDptSellerHasInsufficientlyDpt() public {
+        uint sentEth = 1 ether;
+
+        // reset dptSeller balance
+        dptSeller.doTransfer(address(this), INITIAL_BALANCE);
+        user.doBuyTokensWithFee(sentEth);
+    }
+
+    /**
+    * @dev ethPriceFeed is invlid, manual ethUsdRate must be taken
+    */
+    function testBuyTokensWithFeeWithManualEthUsdRate() public {
+        uint sentEth = 1 ether;
+        ethUsdRate = 400 ether;
+        exchange.setEthUsdRate(ethUsdRate);
+        ethPriceFeed.setValid(false);
+
+        user.doBuyTokensWithFee(sentEth);
+
+        uint feeInDpt = wdiv(fee, dptUsdRate);
+        uint feeInEth = wdiv(fee, ethUsdRate);
+        // DPT (eq fee in USD) must be sold from dptSeller balance
+        assertEq(dpt.balanceOf(address(dptSeller)), sub(INITIAL_BALANCE, feeInDpt));
+        // DPT fee have to be transfered to crematorium
+        assertEq(dpt.balanceOf(crematorium), feeInDpt);
+
+        // ETH (minus ETH for DPT fee) must be sent to owner balance from user balance
+        assertEq(address(this).balance, add(ownerBalance, sub(sentEth, feeInEth)));
+        // ETH for DPT fee must be sent to dptSeller balance from user balance
+        assertEq(address(dptSeller).balance, add(dptSellerBalance, feeInEth));
+        // ETH on user balance
+        assertEq(address(user).balance, sub(userBalance, sentEth));
+
+        // CDC must be transfered to user
+        assertEq(cdc.balanceOf(user), wdiv(sub(wmul(sentEth, ethUsdRate), fee), cdcUsdRate));
+    }
+
+    /**
+    * @dev dptPriceFeed is invlid, manual dptUsdRate must be taken
+    */
+    function testBuyTokensWithFeeWithManualDptUsdRate() public {
+        uint sentEth = 1 ether;
+        dptUsdRate = 9.99 ether;
+        exchange.setDptUsdRate(dptUsdRate);
+        dptPriceFeed.setValid(false);
+
+        user.doBuyTokensWithFee(sentEth);
+
+        uint feeInDpt = wdiv(fee, dptUsdRate);
+        uint feeInEth = wdiv(fee, ethUsdRate);
+        // DPT (eq fee in USD) must be sold from dptSeller balance
+        assertEq(dpt.balanceOf(address(dptSeller)), sub(INITIAL_BALANCE, feeInDpt));
+        // DPT fee have to be transfered to crematorium
+        assertEq(dpt.balanceOf(crematorium), feeInDpt);
+
+        // ETH (minus ETH for DPT fee) must be sent to owner balance from user balance
+        assertEq(address(this).balance, add(ownerBalance, sub(sentEth, feeInEth)));
+        // ETH for DPT fee must be sent to dptSeller balance from user balance
+        assertEq(address(dptSeller).balance, add(dptSellerBalance, feeInEth));
+        // ETH on user balance
+        assertEq(address(user).balance, sub(userBalance, sentEth));
+
+        // CDC must be transfered to user
+        assertEq(cdc.balanceOf(user), wdiv(sub(wmul(sentEth, ethUsdRate), fee), cdcUsdRate));
+    }
+
+    /**
+    * @dev cdcPriceFeed is invlid, manual cdcUsdRate must be taken
+    */
+    function testBuyTokensWithFeeWithManualCdcUsdRate() public {
+        uint sentEth = 1 ether;
+        cdcUsdRate = 40 ether;
+        exchange.setCdcUsdRate(cdcUsdRate);
+        cdcPriceFeed.setValid(false);
+
+        user.doBuyTokensWithFee(sentEth);
+
+        uint feeInDpt = wdiv(fee, dptUsdRate);
+        uint feeInEth = wdiv(fee, ethUsdRate);
+        // DPT (eq fee in USD) must be sold from dptSeller balance
+        assertEq(dpt.balanceOf(address(dptSeller)), sub(INITIAL_BALANCE, feeInDpt));
+        // DPT fee have to be transfered to crematorium
+        assertEq(dpt.balanceOf(crematorium), feeInDpt);
+
+        // ETH (minus ETH for DPT fee) must be sent to owner balance from user balance
+        assertEq(address(this).balance, add(ownerBalance, sub(sentEth, feeInEth)));
+        // ETH for DPT fee must be sent to dptSeller balance from user balance
+        assertEq(address(dptSeller).balance, add(dptSellerBalance, feeInEth));
+        // ETH on user balance
+        assertEq(address(user).balance, sub(userBalance, sentEth));
+
+        // CDC must be transfered to user
+        assertEq(cdc.balanceOf(user), wdiv(sub(wmul(sentEth, ethUsdRate), fee), cdcUsdRate));
     }
 }
