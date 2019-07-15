@@ -539,4 +539,47 @@ contract CdcExchangeTest is DSTest, DSMath, CdcExchangeEvents {
         // CDC must be transfered to user
         assertEq(cdc.balanceOf(user), wdiv(sub(wmul(sentEth, ethUsdRate), fee), cdcUsdRate));
     }
+
+    /**
+    * @dev Transaction should be failed on sending 0 ETH
+    */
+    function testFailBuyTokensWithFeeSendZeroEth() public {
+        uint sentEth = 0;
+        user.doBuyTokensWithFee(sentEth);
+    }
+
+    /**
+    * @dev Buy tokens with zero fee
+    */
+    function testBuyTokensWithFeeWhenFeeIsZero() public {
+        uint sentEth = 1 ether;
+        exchange.setFee(0);
+
+        user.doBuyTokensWithFee(sentEth);
+
+        // DPT balance of dptSeller must be untouched
+        assertEq(dpt.balanceOf(address(dptSeller)), INITIAL_BALANCE);
+        // Nothing should be burned
+        assertEq(dpt.balanceOf(crematorium), 0);
+
+        // ETH must be sent to owner balance from user balance
+        assertEq(address(this).balance, add(ownerBalance, sentEth));
+        // ETH on user balance
+        assertEq(address(user).balance, sub(userBalance, sentEth));
+
+        // CDC must be transfered to user
+        assertEq(cdc.balanceOf(user), wdiv(wmul(sentEth, ethUsdRate), cdcUsdRate));
+    }
+
+    /**
+    * @dev Buy tokens with max eth value
+    */
+    function testFailBuyTokensWithFeeWhenAmountMax() public {
+        uint sentEth = uint(-1);
+        // User does not have any CDC
+        assertEq(cdc.balanceOf(user), 0);
+
+        user.doBuyTokensWithFee(sentEth);
+    }
+
 }
