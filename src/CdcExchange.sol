@@ -133,7 +133,7 @@ contract CdcExchange is DSAuth, DSStop, DSMath, CdcExchangeEvents {
             // Take fee in DPT from user balance
             uint remainingFeeDpt = takeFeeInDptFromUser(msg.sender, feeDpt);
 
-            // insufficient funds of DPT => user has to buy remained fee by ETH
+            // insufficient funds of DPT => user has to buy remaining fee by ETH
             if (remainingFeeDpt > 0) {
                 uint feeEth = buyDptFee(remainingFeeDpt);
                 amountEthToBuyCdc = sub(amountEthToBuyCdc, feeEth);
@@ -255,7 +255,7 @@ contract CdcExchange is DSAuth, DSStop, DSMath, CdcExchangeEvents {
     }
 
 
-    // internals functions
+    // internal functions
 
     /**
     * @dev Get ETH/USD rate from priceFeed or if allowed manually setted ethUsdRate
@@ -273,7 +273,7 @@ contract CdcExchange is DSAuth, DSStop, DSMath, CdcExchangeEvents {
             ethUsdRate = uint(ethUsdRateBytes);
         } else {
             // if feed invalid revert if manualEthRate is NOT allowed
-            require(manualEthRate, "Manual rate not allowed");
+            require(manualEthRate, "Feed is invalid and manual rate is not allowed");
         }
     }
 
