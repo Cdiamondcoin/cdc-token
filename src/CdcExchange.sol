@@ -122,29 +122,29 @@ contract CdcExchange is DSAuth, DSStop, DSMath, CdcExchangeEvents {
         // Getting rates from price feeds
         updateRates();
 
-        uint ethAmountToBuyCdc = msg.value;
+        uint amountEthToBuyCdc = msg.value;
         // Get fee in USD
         fee = calculateFee(msg.sender, msg.value);
 
         // TODO: move to function?
         if (fee > 0) {
             // Convert to DPT
-            uint feeInDpt = wdiv(fee, dptUsdRate);
+            uint feeDpt = wdiv(fee, dptUsdRate);
             // Take fee in DPT from user balance
-            uint remainedFeeInDpt = takeFeeInDptFromUser(msg.sender, feeInDpt);
+            uint remainingFeeDpt = takeFeeInDptFromUser(msg.sender, feeDpt);
 
             // insufficient funds of DPT => user has to buy remained fee by ETH
-            if (remainedFeeInDpt > 0) {
-                uint feeEth = buyDptFee(remainedFeeInDpt);
-                ethAmountToBuyCdc = sub(ethAmountToBuyCdc, feeEth);
+            if (remainingFeeDpt > 0) {
+                uint feeEth = buyDptFee(remainingFeeDpt);
+                amountEthToBuyCdc = sub(amountEthToBuyCdc, feeEth);
             }
 
             // "burn" DPT fee
-            dpt.transfer(burner, feeInDpt);
+            dpt.transfer(burner, feeDpt);
         }
 
         // send CDC to user
-        tokens = sellCdc(msg.sender, ethAmountToBuyCdc);
+        tokens = sellCdc(msg.sender, amountEthToBuyCdc);
 
         emit LogBuyTokenWithFee(owner, msg.sender, msg.value, tokens, cdcUsdRate, fee);
         return tokens;
@@ -327,52 +327,52 @@ contract CdcExchange is DSAuth, DSStop, DSMath, CdcExchangeEvents {
     * @dev User buy fee from dptSeller in DPT by ETH with actual DPT/USD and ETH/USD rate.
     * @return the amount of sold fee in ETH
     */
-    function buyDptFee(uint feeInDpt) internal returns (uint ethAmount) {
-        uint feeInUsd = wmul(feeInDpt, dptUsdRate);
+    function buyDptFee(uint feeDpt) internal returns (uint amountEth) {
+        uint feeUsd = wmul(feeDpt, dptUsdRate);
         // calculate fee in ETH
-        ethAmount = wdiv(feeInUsd, ethUsdRate);
+        amountEth = wdiv(feeUsd, ethUsdRate);
         // user pays for fee
-        address(dptSeller).transfer(ethAmount);
+        address(dptSeller).transfer(amountEth);
         // transfer bought fee to contract, this fee will be burned
-        dpt.transferFrom(dptSeller, address(this), feeInDpt);
+        dpt.transferFrom(dptSeller, address(this), feeDpt);
 
-        emit LogBuyDptFee(msg.sender, ethAmount, ethUsdRate, dptUsdRate, feeInUsd);
-        return ethAmount;
+        emit LogBuyDptFee(msg.sender, amountEth, ethUsdRate, dptUsdRate, feeUsd);
+        return amountEth;
     }
 
     /**
     * @dev Take fee in DPT from user if it has any
-    * @param feeInDpt the fee amount in DPT
-    * @return the remained fee amount in DPT
+    * @param feeDpt the fee amount in DPT
+    * @return the remaining fee amount in DPT
     */
-    function takeFeeInDptFromUser(address user, uint feeInDpt) internal returns (uint remainFee) {
+    function takeFeeInDptFromUser(address user, uint feeDpt) internal returns (uint remainingFee) {
         uint dptUserBalance = dpt.balanceOf(user);
 
         // Not any DPT on balance
         if (dptUserBalance <= 0) {
-            remainFee = feeInDpt;
+            remainingFee = feeDpt;
         // User has enough DPT to fee
-        } else if (dptUserBalance >= feeInDpt) {
-            remainFee = 0;
+        } else if (dptUserBalance >= feeDpt) {
+            remainingFee = 0;
             // transfer to contract for future burn
-            dpt.transferFrom(user, address(this), feeInDpt);
+            dpt.transferFrom(user, address(this), feeDpt);
         // User has less DPT than required
         } else {
-            remainFee = sub(feeInDpt, dptUserBalance);
+            remainingFee = sub(feeDpt, dptUserBalance);
             // transfer to contract for future burn
             dpt.transferFrom(user, address(this), dptUserBalance);
         }
-        return remainFee;
+        return remainingFee;
     }
 
     /**
     * @dev Calculate and transfer CDC tokens to user. Transfer ETH to owner for CDC
     * @return sold token amount
     */
-    function sellCdc(address user, uint ethAmount) internal returns (uint tokens) {
-        tokens = wdiv(wmul(ethAmount, ethUsdRate), cdcUsdRate);
+    function sellCdc(address user, uint amountEth) internal returns (uint tokens) {
+        tokens = wdiv(wmul(amountEth, ethUsdRate), cdcUsdRate);
         cdc.transferFrom(owner, user, tokens);
-        address(owner).transfer(ethAmount);
+        address(owner).transfer(amountEth);
         return tokens;
     }
 }

@@ -365,17 +365,17 @@ contract CdcExchangeTest is DSTest, DSMath, CdcExchangeEvents {
 
         user.doBuyTokensWithFee(sentEth);
 
-        uint feeInDpt = wdiv(fee, dptUsdRate);
-        uint feeInEth = wdiv(fee, ethUsdRate);
+        uint feeDpt = wdiv(fee, dptUsdRate);
+        uint feeEth = wdiv(fee, ethUsdRate);
         // DPT (eq fee in USD) must be sold from dptSeller balance
-        assertEq(dpt.balanceOf(address(dptSeller)), sub(INITIAL_BALANCE, feeInDpt));
+        assertEq(dpt.balanceOf(address(dptSeller)), sub(INITIAL_BALANCE, feeDpt));
         // DPT fee have to be transfered to burner
-        assertEq(dpt.balanceOf(burner), feeInDpt);
+        assertEq(dpt.balanceOf(burner), feeDpt);
 
         // ETH (minus ETH for DPT fee) must be sent to owner balance from user balance
-        assertEq(address(this).balance, add(ownerBalance, sub(sentEth, feeInEth)));
+        assertEq(address(this).balance, add(ownerBalance, sub(sentEth, feeEth)));
         // ETH for DPT fee must be sent to dptSeller balance from user balance
-        assertEq(address(dptSeller).balance, add(dptSellerBalance, feeInEth));
+        assertEq(address(dptSeller).balance, add(dptSellerBalance, feeEth));
         // ETH on user balance
         assertEq(address(user).balance, sub(userBalance, sentEth));
 
@@ -396,12 +396,12 @@ contract CdcExchangeTest is DSTest, DSMath, CdcExchangeEvents {
 
         user.doBuyTokensWithFee(sentEth);
 
-        uint feeInDpt = wdiv(fee, dptUsdRate);
+        uint feeDpt = wdiv(fee, dptUsdRate);
         // DPT balance of dptSeller must be untouched
         assertEq(dpt.balanceOf(address(dptSeller)), INITIAL_BALANCE);
         // DPT fee have to be transfered to burner from user
-        assertEq(dpt.balanceOf(burner), feeInDpt);
-        assertEq(dpt.balanceOf(user), sub(INITIAL_BALANCE, feeInDpt));
+        assertEq(dpt.balanceOf(burner), feeDpt);
+        assertEq(dpt.balanceOf(user), sub(INITIAL_BALANCE, feeDpt));
 
         // ETH must be sent to owner balance from user balance
         assertEq(address(this).balance, add(ownerBalance, sentEth));
@@ -426,19 +426,19 @@ contract CdcExchangeTest is DSTest, DSMath, CdcExchangeEvents {
 
         user.doBuyTokensWithFee(sentEth);
 
-        uint feeInDpt = wdiv(fee, dptUsdRate);
+        uint feeDpt = wdiv(fee, dptUsdRate);
         // DPT must be sold from dptSeller balance
-        assertEq(dpt.balanceOf(address(dptSeller)), sub(INITIAL_BALANCE, sub(feeInDpt, userDptBalance)));
+        assertEq(dpt.balanceOf(address(dptSeller)), sub(INITIAL_BALANCE, sub(feeDpt, userDptBalance)));
         // DPT fee have to be transfered to burner
-        assertEq(dpt.balanceOf(burner), feeInDpt);
+        assertEq(dpt.balanceOf(burner), feeDpt);
         assertEq(dpt.balanceOf(user), 0);
 
-        uint buyableFeeInUsd = wmul(sub(feeInDpt, userDptBalance), dptUsdRate);
-        uint buyableFeeInEth = wdiv(buyableFeeInUsd, ethUsdRate);
+        uint buyableFeeUsd = wmul(sub(feeDpt, userDptBalance), dptUsdRate);
+        uint buyableFeeEth = wdiv(buyableFeeUsd, ethUsdRate);
         // ETH must be sent to owner balance from user balance
-        assertEq(address(this).balance, add(ownerBalance, sub(sentEth, buyableFeeInEth)));
+        assertEq(address(this).balance, add(ownerBalance, sub(sentEth, buyableFeeEth)));
         // ETH for DPT fee must be sent to dptSeller
-        assertEq(address(dptSeller).balance, add(dptSellerBalance, buyableFeeInEth));
+        assertEq(address(dptSeller).balance, add(dptSellerBalance, buyableFeeEth));
         // ETH on user balance
         assertEq(address(user).balance, sub(userBalance, sentEth));
 
@@ -469,17 +469,17 @@ contract CdcExchangeTest is DSTest, DSMath, CdcExchangeEvents {
 
         user.doBuyTokensWithFee(sentEth);
 
-        uint feeInDpt = wdiv(fee, dptUsdRate);
-        uint feeInEth = wdiv(fee, ethUsdRate);
+        uint feeDpt = wdiv(fee, dptUsdRate);
+        uint feeEth = wdiv(fee, ethUsdRate);
         // DPT (eq fee in USD) must be sold from dptSeller balance
-        assertEq(dpt.balanceOf(address(dptSeller)), sub(INITIAL_BALANCE, feeInDpt));
+        assertEq(dpt.balanceOf(address(dptSeller)), sub(INITIAL_BALANCE, feeDpt));
         // DPT fee have to be transfered to burner
-        assertEq(dpt.balanceOf(burner), feeInDpt);
+        assertEq(dpt.balanceOf(burner), feeDpt);
 
         // ETH (minus ETH for DPT fee) must be sent to owner balance from user balance
-        assertEq(address(this).balance, add(ownerBalance, sub(sentEth, feeInEth)));
+        assertEq(address(this).balance, add(ownerBalance, sub(sentEth, feeEth)));
         // ETH for DPT fee must be sent to dptSeller balance from user balance
-        assertEq(address(dptSeller).balance, add(dptSellerBalance, feeInEth));
+        assertEq(address(dptSeller).balance, add(dptSellerBalance, feeEth));
         // ETH on user balance
         assertEq(address(user).balance, sub(userBalance, sentEth));
 
@@ -498,17 +498,17 @@ contract CdcExchangeTest is DSTest, DSMath, CdcExchangeEvents {
 
         user.doBuyTokensWithFee(sentEth);
 
-        uint feeInDpt = wdiv(fee, dptUsdRate);
-        uint feeInEth = wdiv(fee, ethUsdRate);
+        uint feeDpt = wdiv(fee, dptUsdRate);
+        uint feeEth = wdiv(fee, ethUsdRate);
         // DPT (eq fee in USD) must be sold from dptSeller balance
-        assertEq(dpt.balanceOf(address(dptSeller)), sub(INITIAL_BALANCE, feeInDpt));
+        assertEq(dpt.balanceOf(address(dptSeller)), sub(INITIAL_BALANCE, feeDpt));
         // DPT fee have to be transfered to burner
-        assertEq(dpt.balanceOf(burner), feeInDpt);
+        assertEq(dpt.balanceOf(burner), feeDpt);
 
         // ETH (minus ETH for DPT fee) must be sent to owner balance from user balance
-        assertEq(address(this).balance, add(ownerBalance, sub(sentEth, feeInEth)));
+        assertEq(address(this).balance, add(ownerBalance, sub(sentEth, feeEth)));
         // ETH for DPT fee must be sent to dptSeller balance from user balance
-        assertEq(address(dptSeller).balance, add(dptSellerBalance, feeInEth));
+        assertEq(address(dptSeller).balance, add(dptSellerBalance, feeEth));
         // ETH on user balance
         assertEq(address(user).balance, sub(userBalance, sentEth));
 
@@ -527,17 +527,17 @@ contract CdcExchangeTest is DSTest, DSMath, CdcExchangeEvents {
 
         user.doBuyTokensWithFee(sentEth);
 
-        uint feeInDpt = wdiv(fee, dptUsdRate);
-        uint feeInEth = wdiv(fee, ethUsdRate);
+        uint feeDpt = wdiv(fee, dptUsdRate);
+        uint feeEth = wdiv(fee, ethUsdRate);
         // DPT (eq fee in USD) must be sold from dptSeller balance
-        assertEq(dpt.balanceOf(address(dptSeller)), sub(INITIAL_BALANCE, feeInDpt));
+        assertEq(dpt.balanceOf(address(dptSeller)), sub(INITIAL_BALANCE, feeDpt));
         // DPT fee have to be transfered to burner
-        assertEq(dpt.balanceOf(burner), feeInDpt);
+        assertEq(dpt.balanceOf(burner), feeDpt);
 
         // ETH (minus ETH for DPT fee) must be sent to owner balance from user balance
-        assertEq(address(this).balance, add(ownerBalance, sub(sentEth, feeInEth)));
+        assertEq(address(this).balance, add(ownerBalance, sub(sentEth, feeEth)));
         // ETH for DPT fee must be sent to dptSeller balance from user balance
-        assertEq(address(dptSeller).balance, add(dptSellerBalance, feeInEth));
+        assertEq(address(dptSeller).balance, add(dptSellerBalance, feeEth));
         // ETH on user balance
         assertEq(address(user).balance, sub(userBalance, sentEth));
 
