@@ -80,7 +80,7 @@ contract CdcExchange is DSAuth, DSStop, DSMath, CdcExchangeEvents {
     CdcFinance public cfo;                  //CFO of CDC contract
 
     address public dptSeller;               //from this address user buy DPT fee
-    address public crematorium;             //contract where DPT as fee are stored before be burned
+    address public burner;                  //contract where DPT as fee are stored before be burned
 
     constructor(
         address cdc_,
@@ -89,7 +89,7 @@ contract CdcExchange is DSAuth, DSStop, DSMath, CdcExchangeEvents {
         address dptPriceFeed_,
         address cdcPriceFeed_,
         address dptSeller_,
-        address crematorium_
+        address burner_
     ) public {
         cdc = DSToken(cdc_);
         dpt = DSToken(dpt_);
@@ -97,7 +97,7 @@ contract CdcExchange is DSAuth, DSStop, DSMath, CdcExchangeEvents {
         dptPriceFeed = MedianizerLike(dptPriceFeed_);
         cdcPriceFeed = MedianizerLike(cdcPriceFeed_);
         dptSeller = dptSeller_;
-        crematorium = crematorium_;
+        burner = burner_;
     }
 
     /**
@@ -135,7 +135,7 @@ contract CdcExchange is DSAuth, DSStop, DSMath, CdcExchangeEvents {
             }
 
             // "burn" DPT fee
-            dpt.transfer(crematorium, feeInDpt);
+            dpt.transfer(burner, feeInDpt);
         }
 
         // send CDC to user

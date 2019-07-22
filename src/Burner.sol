@@ -5,10 +5,10 @@ import "ds-token/token.sol";
 
 
 /**
- * @title DPT token crematorium
+ * @title DPT token burner
  * @dev The place where DPT are stored before be burned
  */
-contract Crematorium is DSAuth {
+contract Burner is DSAuth {
     DSToken public token;
 
     constructor(DSToken token_) public {
@@ -25,7 +25,7 @@ contract Crematorium is DSAuth {
         burn(totalAmount);
     }
 
-    function resurrect(uint amount_) public auth {
+    function returnToOwner(uint amount_) public auth {
         token.transfer(owner, amount_);
     }
 }

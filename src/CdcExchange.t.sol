@@ -5,7 +5,7 @@ import "ds-math/math.sol";
 import "ds-token/token.sol";
 import "./Cdc.sol";
 import "./CdcExchange.sol";
-import "./Crematorium.sol";
+import "./Burner.sol";
 
 
 contract TestCdcFinance {
@@ -141,7 +141,7 @@ contract CdcExchangeTest is DSTest, DSMath, CdcExchangeEvents {
     TestMedianizerLike dptPriceFeed;
     TestMedianizerLike cdcPriceFeed;
 
-    Crematorium crematorium;
+    Burner burner;
     TestCdcFinance cfo;
 
     // test variables
@@ -163,9 +163,9 @@ contract CdcExchangeTest is DSTest, DSMath, CdcExchangeEvents {
         dptPriceFeed = new TestMedianizerLike(dptUsdRate, true);
         cdcPriceFeed = new TestMedianizerLike(cdcUsdRate, true);
 
-        crematorium = new Crematorium(dpt);
+        burner = new Burner(dpt);
         dptSeller = new DptTester(dpt);
-        exchange = new CdcExchange(cdc, dpt, ethPriceFeed, dptPriceFeed, cdcPriceFeed, dptSeller, crematorium);
+        exchange = new CdcExchange(cdc, dpt, ethPriceFeed, dptPriceFeed, cdcPriceFeed, dptSeller, burner);
         exchange.setFee(fee);
         user = new CdcExchangeTester(exchange, dpt);
         cfo = new TestCdcFinance();
@@ -364,8 +364,8 @@ contract CdcExchangeTest is DSTest, DSMath, CdcExchangeEvents {
         uint feeInEth = wdiv(fee, ethUsdRate);
         // DPT (eq fee in USD) must be sold from dptSeller balance
         assertEq(dpt.balanceOf(address(dptSeller)), sub(INITIAL_BALANCE, feeInDpt));
-        // DPT fee have to be transfered to crematorium
-        assertEq(dpt.balanceOf(crematorium), feeInDpt);
+        // DPT fee have to be transfered to burner
+        assertEq(dpt.balanceOf(burner), feeInDpt);
 
         // ETH (minus ETH for DPT fee) must be sent to owner balance from user balance
         assertEq(address(this).balance, add(ownerBalance, sub(sentEth, feeInEth)));
@@ -394,8 +394,8 @@ contract CdcExchangeTest is DSTest, DSMath, CdcExchangeEvents {
         uint feeInDpt = wdiv(fee, dptUsdRate);
         // DPT balance of dptSeller must be untouched
         assertEq(dpt.balanceOf(address(dptSeller)), INITIAL_BALANCE);
-        // DPT fee have to be transfered to crematorium from user
-        assertEq(dpt.balanceOf(crematorium), feeInDpt);
+        // DPT fee have to be transfered to burner from user
+        assertEq(dpt.balanceOf(burner), feeInDpt);
         assertEq(dpt.balanceOf(user), sub(INITIAL_BALANCE, feeInDpt));
 
         // ETH must be sent to owner balance from user balance
@@ -424,8 +424,8 @@ contract CdcExchangeTest is DSTest, DSMath, CdcExchangeEvents {
         uint feeInDpt = wdiv(fee, dptUsdRate);
         // DPT must be sold from dptSeller balance
         assertEq(dpt.balanceOf(address(dptSeller)), sub(INITIAL_BALANCE, sub(feeInDpt, userDptBalance)));
-        // DPT fee have to be transfered to crematorium
-        assertEq(dpt.balanceOf(crematorium), feeInDpt);
+        // DPT fee have to be transfered to burner
+        assertEq(dpt.balanceOf(burner), feeInDpt);
         assertEq(dpt.balanceOf(user), 0);
 
         uint buyableFeeInUsd = wmul(sub(feeInDpt, userDptBalance), dptUsdRate);
@@ -468,8 +468,8 @@ contract CdcExchangeTest is DSTest, DSMath, CdcExchangeEvents {
         uint feeInEth = wdiv(fee, ethUsdRate);
         // DPT (eq fee in USD) must be sold from dptSeller balance
         assertEq(dpt.balanceOf(address(dptSeller)), sub(INITIAL_BALANCE, feeInDpt));
-        // DPT fee have to be transfered to crematorium
-        assertEq(dpt.balanceOf(crematorium), feeInDpt);
+        // DPT fee have to be transfered to burner
+        assertEq(dpt.balanceOf(burner), feeInDpt);
 
         // ETH (minus ETH for DPT fee) must be sent to owner balance from user balance
         assertEq(address(this).balance, add(ownerBalance, sub(sentEth, feeInEth)));
@@ -497,8 +497,8 @@ contract CdcExchangeTest is DSTest, DSMath, CdcExchangeEvents {
         uint feeInEth = wdiv(fee, ethUsdRate);
         // DPT (eq fee in USD) must be sold from dptSeller balance
         assertEq(dpt.balanceOf(address(dptSeller)), sub(INITIAL_BALANCE, feeInDpt));
-        // DPT fee have to be transfered to crematorium
-        assertEq(dpt.balanceOf(crematorium), feeInDpt);
+        // DPT fee have to be transfered to burner
+        assertEq(dpt.balanceOf(burner), feeInDpt);
 
         // ETH (minus ETH for DPT fee) must be sent to owner balance from user balance
         assertEq(address(this).balance, add(ownerBalance, sub(sentEth, feeInEth)));
@@ -526,8 +526,8 @@ contract CdcExchangeTest is DSTest, DSMath, CdcExchangeEvents {
         uint feeInEth = wdiv(fee, ethUsdRate);
         // DPT (eq fee in USD) must be sold from dptSeller balance
         assertEq(dpt.balanceOf(address(dptSeller)), sub(INITIAL_BALANCE, feeInDpt));
-        // DPT fee have to be transfered to crematorium
-        assertEq(dpt.balanceOf(crematorium), feeInDpt);
+        // DPT fee have to be transfered to burner
+        assertEq(dpt.balanceOf(burner), feeInDpt);
 
         // ETH (minus ETH for DPT fee) must be sent to owner balance from user balance
         assertEq(address(this).balance, add(ownerBalance, sub(sentEth, feeInEth)));
@@ -560,7 +560,7 @@ contract CdcExchangeTest is DSTest, DSMath, CdcExchangeEvents {
         // DPT balance of dptSeller must be untouched
         assertEq(dpt.balanceOf(address(dptSeller)), INITIAL_BALANCE);
         // Nothing should be burned
-        assertEq(dpt.balanceOf(crematorium), 0);
+        assertEq(dpt.balanceOf(burner), 0);
 
         // ETH must be sent to owner balance from user balance
         assertEq(address(this).balance, add(ownerBalance, sentEth));

@@ -2,7 +2,7 @@ pragma solidity ^0.4.25;
 
 import "ds-test/test.sol";
 import "ds-token/token.sol";
-import "./Crematorium.sol";
+import "./Burner.sol";
 
 contract TokenUser {
     DSToken token;
@@ -12,43 +12,43 @@ contract TokenUser {
     }
 }
 
-contract CrematoriumTest is DSTest {
+contract BurnerTest is DSTest {
     uint constant initialBalance = 1000;
 
     DSToken token;
     TokenUser user;
-    Crematorium creamatorioum;
+    Burner burner;
     address self;
 
     function setUp() public {
         token = new DSToken("DPT");
         token.mint(initialBalance);
         user = new TokenUser(token);
-        creamatorioum = new Crematorium(token);
-        // To burn creamatorioum have to be owner of token
-        token.setOwner(address(creamatorioum));
+        burner = new Burner(token);
+        // To burn burner have to be owner of token
+        token.setOwner(address(burner));
         self = address(this);
     }
 
     function testValidBurn() public {
         uint sentAmount = 250;
-        token.transfer(creamatorioum, sentAmount);
-        creamatorioum.burn(sentAmount);
+        token.transfer(burner, sentAmount);
+        burner.burn(sentAmount);
         assertEq(token.totalSupply(), initialBalance - sentAmount);
     }
 
     function testValidAllBurn() public {
         uint sentAmount = 250;
-        token.transfer(creamatorioum, sentAmount);
-        creamatorioum.burnAll();
+        token.transfer(burner, sentAmount);
+        burner.burnAll();
         assertEq(token.totalSupply(), initialBalance - sentAmount);
     }
 
-    function testResurrect() public {
+    function testReturnToOwner() public {
         uint sentAmount = 250;
-        token.transfer(creamatorioum, sentAmount);
-        creamatorioum.resurrect(sentAmount);
+        token.transfer(burner, sentAmount);
+        burner.returnToOwner(sentAmount);
         assertEq(token.totalSupply(), initialBalance);
-        assertEq(token.balanceOf(creamatorioum.owner()), initialBalance);
+        assertEq(token.balanceOf(burner.owner()), initialBalance);
     }
 }
