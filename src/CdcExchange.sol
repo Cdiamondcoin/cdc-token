@@ -126,21 +126,9 @@ contract CdcExchange is DSAuth, DSStop, DSMath, CdcExchangeEvents {
         // Get fee in USD
         fee = calculateFee(msg.sender, msg.value);
 
-        // TODO: move to function?
         if (fee > 0) {
-            // Convert to DPT
-            uint feeDpt = wdiv(fee, dptUsdRate);
-            // Take fee in DPT from user balance
-            uint remainingFeeDpt = takeFeeInDptFromUser(msg.sender, feeDpt);
-
-            // insufficient funds of DPT => user has to buy remaining fee by ETH
-            if (remainingFeeDpt > 0) {
-                uint feeEth = buyDptFee(remainingFeeDpt);
-                amountEthToBuyCdc = sub(amountEthToBuyCdc, feeEth);
-            }
-
-            // "burn" DPT fee
-            dpt.transfer(burner, feeDpt);
+            // take or sell fee and return remaining ETH amount to buy CDC
+            amountEthToBuyCdc = takeFee(fee, amountEthToBuyCdc);
         }
 
         // send CDC to user
@@ -321,6 +309,28 @@ contract CdcExchange is DSAuth, DSStop, DSMath, CdcExchangeEvents {
         updateEthUsdRate();
         updateDptUsdRate();
         updateCdcUsdRate();
+    }
+
+    /**
+    * @dev Taking fee from user. If user has DPT take it, if there are no funds buy it
+    * @return the amount of remaining ETH after buying fee if it was required
+    */
+    function takeFee(uint feeUsd, uint amountEth) internal returns(uint remainingEth) {
+        remainingEth = amountEth;
+        // Convert to DPT
+        uint feeDpt = wdiv(feeUsd, dptUsdRate);
+        // Take fee in DPT from user balance
+        uint remainingFeeDpt = takeFeeInDptFromUser(msg.sender, feeDpt);
+
+        // insufficient funds of DPT => user has to buy remaining fee by ETH
+        if (remainingFeeDpt > 0) {
+            uint feeEth = buyDptFee(remainingFeeDpt);
+            remainingEth = sub(remainingEth, feeEth);
+        }
+
+        // "burn" DPT fee
+        dpt.transfer(burner, feeDpt);
+        return remainingEth;
     }
 
     /**
