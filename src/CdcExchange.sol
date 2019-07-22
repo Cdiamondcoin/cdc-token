@@ -68,10 +68,9 @@ contract CdcExchange is DSAuth, DSStop, DSMath, CdcExchangeEvents {
     MedianizerLike public dptPriceFeed;     //address of the DPT/USD price feed
     MedianizerLike public cdcPriceFeed;     //address of the CDC/USD price feed
 
-    // TODO: move rates to deploy script or to the constructor?
-    uint public dptUsdRate = 3 ether;       //how many USD 1 DPT cost. 18 digit precision
-    uint public cdcUsdRate = 30 ether;      //how many USD 1 CDC cost. 18 digit precision
-    uint public ethUsdRate = 300 ether;     //how many USD 1 ETH cost. 18 digit precision
+    uint public dptUsdRate;                 //how many USD 1 DPT cost. 18 digit precision
+    uint public cdcUsdRate;                 //how many USD 1 CDC cost. 18 digit precision
+    uint public ethUsdRate;                 //how many USD 1 ETH cost. 18 digit precision
     bool public manualEthRate = true;       //allow to use/set manually setted DPT/USD rate
     bool public manualDptRate = true;       //allow to use/set manually setted CDC/USD rate
     bool public manualCdcRate = true;       //allow to use/set manually setted CDC/USD rate
@@ -89,7 +88,10 @@ contract CdcExchange is DSAuth, DSStop, DSMath, CdcExchangeEvents {
         address dptPriceFeed_,
         address cdcPriceFeed_,
         address dptSeller_,
-        address burner_
+        address burner_,
+        uint dptUsdRate_,
+        uint cdcUsdRate_,
+        uint ethUsdRate_
     ) public {
         cdc = DSToken(cdc_);
         dpt = DSToken(dpt_);
@@ -98,6 +100,9 @@ contract CdcExchange is DSAuth, DSStop, DSMath, CdcExchangeEvents {
         cdcPriceFeed = MedianizerLike(cdcPriceFeed_);
         dptSeller = dptSeller_;
         burner = burner_;
+        dptUsdRate = dptUsdRate_;
+        cdcUsdRate = cdcUsdRate_;
+        ethUsdRate = ethUsdRate_;
     }
 
     /**

@@ -150,9 +150,9 @@ contract CdcExchangeTest is DSTest, DSMath, CdcExchangeEvents {
     uint dptSellerBalance;
 
     uint fee = 3 ether; // USD
-    uint ethUsdRate = 300 ether;
     uint dptUsdRate = 3 ether;
     uint cdcUsdRate = 30 ether;
+    uint ethUsdRate = 300 ether;
 
     function setUp() public {
         cdc = new Cdc();
@@ -165,7 +165,12 @@ contract CdcExchangeTest is DSTest, DSMath, CdcExchangeEvents {
 
         burner = new Burner(dpt);
         dptSeller = new DptTester(dpt);
-        exchange = new CdcExchange(cdc, dpt, ethPriceFeed, dptPriceFeed, cdcPriceFeed, dptSeller, burner);
+        exchange = new CdcExchange(
+            cdc, dpt,
+            ethPriceFeed, dptPriceFeed, cdcPriceFeed,
+            dptSeller, burner,
+            dptUsdRate, cdcUsdRate, ethUsdRate
+        );
         exchange.setFee(fee);
         user = new CdcExchangeTester(exchange, dpt);
         cfo = new TestCdcFinance();
