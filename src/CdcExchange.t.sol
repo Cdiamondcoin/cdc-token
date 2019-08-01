@@ -90,6 +90,10 @@ contract CdcExchangeTester {
         _exchange.setDptPriceFeed(feed);
     }
 
+    function doSetCdcPriceFeed(address feed) public {
+        _exchange.setCdcPriceFeed(feed);
+    }
+
     function doSetDptSeller(address seller) public {
         _exchange.setDptSeller(seller);
     }
@@ -229,8 +233,21 @@ contract CdcExchangeTest is DSTest, DSMath, CdcExchangeEvents {
         exchange.setDptPriceFeed(address(0));
     }
 
-    function testFailNonOwnerSetDptPriceFeed() public {
+    function testFailNonOwnerSetPriceFeed() public {
         user.doSetDptPriceFeed(address(this));
+    }
+
+    function testSetCdcPriceFeed() public {
+        exchange.setCdcPriceFeed(address(this));
+        assertEq(exchange.cdcPriceFeed(), address(this));
+    }
+
+    function testFailWrongAddressSetCdcPriceFeed() public {
+        exchange.setCdcPriceFeed(address(0));
+    }
+
+    function testFailNonOwnerSetCdcPriceFeed() public {
+        user.doSetCdcPriceFeed(address(this));
     }
 
     function testSetDptSeller() public {
