@@ -277,6 +277,7 @@ contract CdcExchangeTest is DSTest, DSMath, CdcExchangeEvents {
 
     function testSetCfo() public {
         exchange.setCfo(address(cfo));
+        assertEq(exchange.cfo(), address(cfo));
     }
 
     function testFailWrongAddressSetCfo() public {
@@ -415,7 +416,7 @@ contract CdcExchangeTest is DSTest, DSMath, CdcExchangeEvents {
     /**
     * @dev User has DPT but less than fee. Send ETH, get CDC, buy remained DPT fee
     */
-    function testBuyTokensWithFeeUserHasInsufficientlyDpt() public {
+    function testBuyTokensWithFeeUserHasInsufficientDpt() public {
         uint sentEth = 1 ether;
         uint userDptBalance = 0.5 ether;
         exchange.setFee(fee);
@@ -450,7 +451,7 @@ contract CdcExchangeTest is DSTest, DSMath, CdcExchangeEvents {
     * @dev DptSeller has insufficient amount of DPT
     * User send ETH and must get money back
     */
-    function testFailBuyTokensWithFeeDptSellerHasInsufficientlyDpt() public {
+    function testFailBuyTokensWithFeeDptSellerHasInsufficientDpt() public {
         uint sentEth = 1 ether;
 
         // reset dptSeller balance
