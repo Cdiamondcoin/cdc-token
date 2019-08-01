@@ -358,20 +358,13 @@ contract CdcExchange is DSAuth, DSStop, DSMath, CdcExchangeEvents {
     function takeFeeInDptFromUser(address user, uint feeDpt) internal returns (uint remainingFee) {
         uint dptUserBalance = dpt.balanceOf(user);
 
-        // Not any DPT on balance
-        if (dptUserBalance <= 0) {
-            remainingFee = feeDpt;
-        // User has enough DPT to fee
-        } else if (dptUserBalance >= feeDpt) {
-            remainingFee = 0;
-            // transfer to contract for future burn
-            dpt.transferFrom(user, address(this), feeDpt);
-        // User has less DPT than required
-        } else {
-            remainingFee = sub(feeDpt, dptUserBalance);
-            // transfer to contract for future burn
-            dpt.transferFrom(user, address(this), dptUserBalance);
-        }
+        // calculate how many DPT user have to buy
+        uint minDpt = min(feeDpt, dptUserBalance);
+        remainingFee = sub(feeDpt, minDpt);
+
+        // transfer to contract for future burn
+        if (minDpt > 0) dpt.transferFrom(user, address(this), minDpt);
+
         return remainingFee;
     }
 
