@@ -7,6 +7,38 @@ import "./Cdc.sol";
 import "./CdcExchange.sol";
 import "./Burner.sol";
 
+// Contract to test internals CdcExchange functions
+contract ExposedCdcExchange is CdcExchange {
+    constructor(
+        address cdc_,
+        address dpt_,
+        address ethPriceFeed_,
+        address dptPriceFeed_,
+        address cdcPriceFeed_,
+        address dptSeller_,
+        address burner_,
+        uint dptUsdRate_,
+        uint cdcUsdRate_,
+        uint ethUsdRate_
+    ) public CdcExchange(
+        cdc_,
+        dpt_,
+        ethPriceFeed_,
+        dptPriceFeed_,
+        cdcPriceFeed_,
+        dptSeller_,
+        burner_,
+        dptUsdRate_,
+        cdcUsdRate_,
+        ethUsdRate_
+    ) {
+        // nothing to do
+    }
+
+    function _updateRates() public {
+        updateRates();
+    }
+}
 
 contract TestCdcFinance {
     uint fee;
@@ -62,10 +94,10 @@ contract DptTester {
 }
 
 contract CdcExchangeTester {
-    CdcExchange public _exchange;
+    ExposedCdcExchange public _exchange;
     DSToken public _dpt;
 
-    constructor(CdcExchange exchange, DSToken dpt) public {
+    constructor(ExposedCdcExchange exchange, DSToken dpt) public {
         _exchange = exchange;
         _dpt = dpt;
     }
@@ -136,7 +168,7 @@ contract CdcExchangeTest is DSTest, DSMath, CdcExchangeEvents {
 
     Cdc cdc;
     DSToken dpt;
-    CdcExchange exchange;
+    ExposedCdcExchange exchange;
 
     DptTester dptSeller;
     CdcExchangeTester user;
@@ -169,7 +201,7 @@ contract CdcExchangeTest is DSTest, DSMath, CdcExchangeEvents {
 
         burner = new Burner(dpt);
         dptSeller = new DptTester(dpt);
-        exchange = new CdcExchange(
+        exchange = new ExposedCdcExchange(
             cdc, dpt,
             ethPriceFeed, dptPriceFeed, cdcPriceFeed,
             dptSeller, burner,
@@ -605,4 +637,18 @@ contract CdcExchangeTest is DSTest, DSMath, CdcExchangeEvents {
         user.doBuyTokensWithFee(sentEth);
     }
 
+    function testUpdateRates() public {
+        cdcUsdRate = 40 ether;
+        dptUsdRate = 12 ether;
+        ethUsdRate = 500 ether;
+        cdcPriceFeed.setRate(cdcUsdRate);
+        dptPriceFeed.setRate(dptUsdRate);
+        ethPriceFeed.setRate(ethUsdRate);
+
+        exchange._updateRates();
+
+        assertEq(exchange.cdcUsdRate(), cdcUsdRate);
+        assertEq(exchange.dptUsdRate(), dptUsdRate);
+        assertEq(exchange.ethUsdRate(), ethUsdRate);
+    }
 }
