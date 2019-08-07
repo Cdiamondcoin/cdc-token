@@ -43,7 +43,7 @@ contract CdcExchangeEvents {
     );
     event LogBuyDptFee(address sender, uint ethValue, uint ethUsdRate, uint dptUsdRate, uint fee);
 
-    event LogDptSellerChange(address dptSeller);
+    event LogLiquidityContractChange(address liquidityContract);
     event LogSetFee(uint fee);
 
     event LogSetEthUsdRate(uint rate);
@@ -78,7 +78,7 @@ contract CdcExchange is DSAuth, DSStop, DSMath, CdcExchangeEvents {
     uint public fee = 0.5 ether;            //fee in USD on buying CDC
     CdcFinance public cfo;                  //CFO of CDC contract
 
-    address public dptSeller;               //from this address user buy DPT fee
+    address public liquidityContract;       //from this address user buy DPT fee
     address public burner;                  //contract where DPT as fee are stored before be burned
 
     constructor(
@@ -87,7 +87,7 @@ contract CdcExchange is DSAuth, DSStop, DSMath, CdcExchangeEvents {
         address ethPriceFeed_,
         address dptPriceFeed_,
         address cdcPriceFeed_,
-        address dptSeller_,
+        address liquidityContract_,
         address burner_,
         uint dptUsdRate_,
         uint cdcUsdRate_,
@@ -98,7 +98,7 @@ contract CdcExchange is DSAuth, DSStop, DSMath, CdcExchangeEvents {
         ethPriceFeed = MedianizerLike(ethPriceFeed_);
         dptPriceFeed = MedianizerLike(dptPriceFeed_);
         cdcPriceFeed = MedianizerLike(cdcPriceFeed_);
-        dptSeller = dptSeller_;
+        liquidityContract = liquidityContract_;
         burner = burner_;
         dptUsdRate = dptUsdRate_;
         cdcUsdRate = cdcUsdRate_;
@@ -188,11 +188,11 @@ contract CdcExchange is DSAuth, DSStop, DSMath, CdcExchangeEvents {
     /**
     * @dev Set the DPT seller with balance > 0
     */
-    function setDptSeller(address dptSeller_) public auth {
-        require(dptSeller_ != 0x0, "Wrong address");
-        require(dpt.balanceOf(dptSeller_) > 0, "Insufficient funds of DPT");
-        dptSeller = dptSeller_;
-        emit LogDptSellerChange(dptSeller);
+    function setLiquidityContract(address liquidityContract_) public auth {
+        require(liquidityContract_ != 0x0, "Wrong address");
+        require(dpt.balanceOf(liquidityContract_) > 0, "Insufficient funds of DPT");
+        liquidityContract = liquidityContract_;
+        emit LogLiquidityContractChange(liquidityContract);
     }
 
     /**
@@ -334,7 +334,7 @@ contract CdcExchange is DSAuth, DSStop, DSMath, CdcExchangeEvents {
     }
 
     /**
-    * @dev User buy fee from dptSeller in DPT by ETH with actual DPT/USD and ETH/USD rate.
+    * @dev User buy fee from liquidityContract in DPT by ETH with actual DPT/USD and ETH/USD rate.
     * @return the amount of sold fee in ETH
     */
     function buyDptFee(uint feeDpt) internal returns (uint amountEth) {
@@ -342,9 +342,9 @@ contract CdcExchange is DSAuth, DSStop, DSMath, CdcExchangeEvents {
         // calculate fee in ETH
         amountEth = wdiv(feeUsd, ethUsdRate);
         // user pays for fee
-        address(dptSeller).transfer(amountEth);
+        address(liquidityContract).transfer(amountEth);
         // transfer bought fee to contract, this fee will be burned
-        dpt.transferFrom(dptSeller, address(this), feeDpt);
+        dpt.transferFrom(liquidityContract, address(this), feeDpt);
 
         emit LogBuyDptFee(msg.sender, amountEth, ethUsdRate, dptUsdRate, feeUsd);
         return amountEth;
