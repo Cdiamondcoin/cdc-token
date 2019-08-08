@@ -329,7 +329,6 @@ contract CdcExchange is DSAuth, DSStop, DSMath, CdcExchangeEvents {
         }
 
         // "burn" DPT fee
-        dpt.transfer(burner, feeDpt);
         return remainingEth;
     }
 
@@ -344,7 +343,7 @@ contract CdcExchange is DSAuth, DSStop, DSMath, CdcExchangeEvents {
         // user pays for fee
         address(liquidityContract).transfer(amountEth);
         // transfer bought fee to contract, this fee will be burned
-        dpt.transferFrom(liquidityContract, address(this), feeDpt);
+        dpt.transferFrom(liquidityContract, burner, feeDpt);
 
         emit LogBuyDptFee(msg.sender, amountEth, ethUsdRate, dptUsdRate, feeUsd);
         return amountEth;
@@ -363,7 +362,7 @@ contract CdcExchange is DSAuth, DSStop, DSMath, CdcExchangeEvents {
         remainingFee = sub(feeDpt, minDpt);
 
         // transfer to contract for future burn
-        if (minDpt > 0) dpt.transferFrom(user, address(this), minDpt);
+        if (minDpt > 0) dpt.transferFrom(user, burner, minDpt);
 
         return remainingFee;
     }
