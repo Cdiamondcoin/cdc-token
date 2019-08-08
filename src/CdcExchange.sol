@@ -237,57 +237,26 @@ contract CdcExchange is DSAuth, DSStop, DSMath, CdcExchangeEvents {
     // internal functions
 
     /**
-    * @dev Get ETH/USD rate from priceFeed 
-    * Revert transaction if not valid feed and manual value not allowed
-    */
-    function updateEthUsdRate() internal {
-        bool feedValid;
-        bytes32 ethUsdRateBytes;
-
-        (ethUsdRateBytes, feedValid) = ethPriceFeed.peek();                           // receive ETH/DPT price
-        if (feedValid) {                                                              // if feed is valid, load ETH/USD rate from it
-            ethUsdRate = uint(ethUsdRateBytes);
-        } else {
-            require(manualEthRate, "Feed is invalid and manual rate is not allowed"); // if feed invalid revert if manualEthRate is NOT allowed
-        }
-    }
-
-    /**
-    * @dev Get DPT/USD rate from priceFeed 
-    * Revert transaction if not valid feed and manual value not allowed
-    */
-    function updateDptUsdRate() internal {
-        bool feedValid;
-        bytes32 dptUsdRateBytes;
-
-        (dptUsdRateBytes, feedValid) = dptPriceFeed.peek();    // receive DPT/USD price
-        if (feedValid) {                                       // if feed is valid, load DPT/USD rate from it
-            dptUsdRate = uint(dptUsdRateBytes);
-        } else {
-            require(manualDptRate, "Manual rate not allowed"); // if feed invalid revert if manualEthRate is NOT allowed
-        }
-    }
-
-    /**
     * @dev Get CDC/USD rate from priceFeed 
     * Revert transaction if not valid feed and manual value not allowed
     */
-    function updateCdcUsdRate() internal {
+    function updateUsdRate(MedianizerLike priceFeed, bool manualRate, uint currentRate) internal view returns (uint usdRate) {
         bool feedValid;
-        bytes32 cdcUsdRateBytes;
+        bytes32 usdRateBytes;
 
-        (cdcUsdRateBytes, feedValid) = cdcPriceFeed.peek();    // receive DPT/USD price
+        (usdRateBytes, feedValid) = priceFeed.peek();          // receive DPT/USD price
         if (feedValid) {                                       // if feed is valid, load DPT/USD rate from it
-            cdcUsdRate = uint(cdcUsdRateBytes);
+            usdRate = uint(usdRateBytes);
         } else {
-            require(manualCdcRate, "Manual rate not allowed"); // if feed invalid revert if manualEthRate is NOT allowed
+            require(manualRate, "Manual rate not allowed");    // if feed invalid revert if manualEthRate is NOT allowed
+            usdRate = currentRate;
         }
     }
 
     function updateRates() internal {
-        updateEthUsdRate();
-        updateDptUsdRate();
-        updateCdcUsdRate();
+        ethUsdRate = updateUsdRate(ethPriceFeed, manualEthRate, ethUsdRate);
+        dptUsdRate = updateUsdRate(dptPriceFeed, manualDptRate, dptUsdRate);
+        cdcUsdRate = updateUsdRate(cdcPriceFeed, manualCdcRate, cdcUsdRate);
     }
 
     /**
