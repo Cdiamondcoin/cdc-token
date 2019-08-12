@@ -8,14 +8,14 @@ import "ds-note/note.sol";
 
 
 /**
-* @dev Contract to getting ETH/USD price
+* @dev Contract to get ETH/USD price
 */
 contract MedianizerLike {
     function peek() external view returns (bytes32, bool);
 }
 
 /**
-* @dev Contract to calculating fee by user and sended amount
+* @dev Contract to calculate user fee based on amount
 */
 contract CdcFinance {
     function calculateFee(address sender, uint value) external view returns (uint);
@@ -68,18 +68,18 @@ contract CdcExchange is DSAuth, DSStop, DSMath, CdcExchangeEvents {
     MedianizerLike public dptPriceFeed;     //address of the DPT/USD price feed
     MedianizerLike public cdcPriceFeed;     //address of the CDC/USD price feed
 
-    uint public dptUsdRate;                 //how many USD 1 DPT cost. 18 digit precision
-    uint public cdcUsdRate;                 //how many USD 1 CDC cost. 18 digit precision
-    uint public ethUsdRate;                 //how many USD 1 ETH cost. 18 digit precision
-    bool public manualEthRate = true;       //allow to use/set manually setted DPT/USD rate
-    bool public manualDptRate = true;       //allow to use/set manually setted CDC/USD rate
-    bool public manualCdcRate = true;       //allow to use/set manually setted CDC/USD rate
+    uint public dptUsdRate;                 //price of 1 DPT in USD. 18 digit precision
+    uint public cdcUsdRate;                 //price of 1 CDC in USD. 18 digit precision
+    uint public ethUsdRate;                 //price of 1 ETH in USD. 18 digit precision
+    bool public manualEthRate = true;       //allow to ETH/USD rate manually if feed is invalid
+    bool public manualDptRate = true;       //allow to DPT/USD rate manually if feed is invalid
+    bool public manualCdcRate = true;       //allow to CDC/USD rate manually if feed is invalid
 
     uint public fee = 0.5 ether;            //fee in USD on buying CDC
-    CdcFinance public cfo;                  //CFO of CDC contract
+    CdcFinance public cfo;                  //fee calculator contract
 
-    address public liquidityContract;       //from this address user buy DPT fee
-    address public burner;                  //contract where DPT as fee are stored before be burned
+    address public liquidityContract;       //contract providing DPT liquidity to pay for fee
+    address public burner;                  //contract where accured fee of DPT is stored before being burned
 
     constructor(
         address cdc_,
@@ -106,34 +106,25 @@ contract CdcExchange is DSAuth, DSStop, DSMath, CdcExchangeEvents {
     }
 
     /**
-    * @dev Fallback function is used to buy tokens.
+    * @dev Fallback function to buy tokens.
     */
     function () external payable {
         buyTokensWithFee();
     }
 
     /**
-    * @dev Тoken purchase with fee. User have to approve DPT before (if it has already)
-    * otherwise transaction w'll fail
+    * @dev Тoken purchase with fee. (If user has DPT he must approve this contract,
+    * otherwise transaction will fail.)
     */
     function buyTokensWithFee() public payable stoppable returns (uint tokens) {
         require(msg.value != 0, "Invalid amount");
-
-        // Getting rates from price feeds
-        updateRates();
-
+        updateRates();                                           // Getting rates from price feeds
         uint amountEthToBuyCdc = msg.value;
-        // Get fee in USD
-        fee = calculateFee(msg.sender, msg.value);
-
+        fee = calculateFee(msg.sender, msg.value);               // Get fee in USD
         if (fee > 0) {
-            // take or sell fee and return remaining ETH amount to buy CDC
-            amountEthToBuyCdc = takeFee(fee, amountEthToBuyCdc);
+            amountEthToBuyCdc = takeFee(fee, amountEthToBuyCdc); // take or sell fee and return remaining ETH amount to buy CDC
         }
-
-        // send CDC to user
-        tokens = sellCdc(msg.sender, amountEthToBuyCdc);
-
+        tokens = sellCdc(msg.sender, amountEthToBuyCdc);         // send CDC to user
         emit LogBuyTokenWithFee(owner, msg.sender, msg.value, tokens, cdcUsdRate, fee);
         return tokens;
     }
@@ -186,7 +177,7 @@ contract CdcExchange is DSAuth, DSStop, DSMath, CdcExchangeEvents {
     }
 
     /**
-    * @dev Set the DPT seller with balance > 0
+    * @dev Set the DPT liquidity providing contract with balance > 0
     */
     function setLiquidityContract(address liquidityContract_) public auth {
         require(liquidityContract_ != 0x0, "Wrong address");
@@ -246,105 +237,53 @@ contract CdcExchange is DSAuth, DSStop, DSMath, CdcExchangeEvents {
     // internal functions
 
     /**
-    * @dev Get ETH/USD rate from priceFeed or if allowed manually setted ethUsdRate
+    * @dev Get CDC/USD rate from priceFeed 
     * Revert transaction if not valid feed and manual value not allowed
     */
-    function updateEthUsdRate() internal {
+    function updateUsdRate(MedianizerLike priceFeed, bool manualRate, uint currentRate) internal view returns (uint usdRate) {
         bool feedValid;
-        bytes32 ethUsdRateBytes;
+        bytes32 usdRateBytes;
 
-        // receive ETH/DPT price
-        (ethUsdRateBytes, feedValid) = ethPriceFeed.peek();
-
-        // if feed is valid, load ETH/USD rate from it
-        if (feedValid) {
-            ethUsdRate = uint(ethUsdRateBytes);
+        (usdRateBytes, feedValid) = priceFeed.peek();          // receive DPT/USD price
+        if (feedValid) {                                       // if feed is valid, load DPT/USD rate from it
+            usdRate = uint(usdRateBytes);
         } else {
-            // if feed invalid revert if manualEthRate is NOT allowed
-            require(manualEthRate, "Feed is invalid and manual rate is not allowed");
-        }
-    }
-
-    /**
-    * @dev Get DPT/USD rate from priceFeed or if allowed manually setted dptUsdRate
-    * Revert transaction if not valid feed and manual value not allowed
-    */
-    function updateDptUsdRate() internal {
-        bool feedValid;
-        bytes32 dptUsdRateBytes;
-
-        // receive DPT/USD price
-        (dptUsdRateBytes, feedValid) = dptPriceFeed.peek();
-
-        // if feed is valid, load DPT/USD rate from it
-        if (feedValid) {
-            dptUsdRate = uint(dptUsdRateBytes);
-        } else {
-            // if feed invalid revert if manualEthRate is NOT allowed
-            require(manualDptRate, "Manual rate not allowed");
-        }
-    }
-
-    /**
-    * @dev Get CDC/USD rate from priceFeed or if allowed manually setted cdcUsdRate
-    * Revert transaction if not valid feed and manual value not allowed
-    */
-    function updateCdcUsdRate() internal {
-        bool feedValid;
-        bytes32 cdcUsdRateBytes;
-
-        // receive DPT/USD price
-        (cdcUsdRateBytes, feedValid) = cdcPriceFeed.peek();
-
-        // if feed is valid, load DPT/USD rate from it
-        if (feedValid) {
-            cdcUsdRate = uint(cdcUsdRateBytes);
-        } else {
-            // if feed invalid revert if manualEthRate is NOT allowed
-            require(manualCdcRate, "Manual rate not allowed");
+            require(manualRate, "Manual rate not allowed");    // if feed invalid revert if manualEthRate is NOT allowed
+            usdRate = currentRate;
         }
     }
 
     function updateRates() internal {
-        updateEthUsdRate();
-        updateDptUsdRate();
-        updateCdcUsdRate();
+        ethUsdRate = updateUsdRate(ethPriceFeed, manualEthRate, ethUsdRate);
+        dptUsdRate = updateUsdRate(dptPriceFeed, manualDptRate, dptUsdRate);
+        cdcUsdRate = updateUsdRate(cdcPriceFeed, manualCdcRate, cdcUsdRate);
     }
 
     /**
-    * @dev Taking fee from user. If user has DPT take it, if there are no funds buy it
+    * @dev Taking fee from user. If user has DPT takes it, if there is none buys it for user.
     * @return the amount of remaining ETH after buying fee if it was required
     */
     function takeFee(uint feeUsd, uint amountEth) internal returns(uint remainingEth) {
         remainingEth = amountEth;
-        // Convert to DPT
-        uint feeDpt = wdiv(feeUsd, dptUsdRate);
-        // Take fee in DPT from user balance
-        uint remainingFeeDpt = takeFeeInDptFromUser(msg.sender, feeDpt);
-
-        // insufficient funds of DPT => user has to buy remaining fee by ETH
-        if (remainingFeeDpt > 0) {
+        uint feeDpt = wdiv(feeUsd, dptUsdRate);                          // Convert to DPT
+        uint remainingFeeDpt = takeFeeInDptFromUser(msg.sender, feeDpt); // Take fee in DPT from user balance
+        if (remainingFeeDpt > 0) {                                       // insufficient funds of DPT => user has to buy remaining fee by ETH
             uint feeEth = buyDptFee(remainingFeeDpt);
             remainingEth = sub(remainingEth, feeEth);
         }
 
-        // "burn" DPT fee
-        dpt.transfer(burner, feeDpt);
         return remainingEth;
     }
 
     /**
-    * @dev User buy fee from liquidityContract in DPT by ETH with actual DPT/USD and ETH/USD rate.
+    * @dev Buy fee in DPT from liquidityContract for ETH using current DPT/USD and ETH/USD rates.
     * @return the amount of sold fee in ETH
     */
     function buyDptFee(uint feeDpt) internal returns (uint amountEth) {
         uint feeUsd = wmul(feeDpt, dptUsdRate);
-        // calculate fee in ETH
-        amountEth = wdiv(feeUsd, ethUsdRate);
-        // user pays for fee
-        address(liquidityContract).transfer(amountEth);
-        // transfer bought fee to contract, this fee will be burned
-        dpt.transferFrom(liquidityContract, address(this), feeDpt);
+        amountEth = wdiv(feeUsd, ethUsdRate);                // calculate fee in ETH
+        address(liquidityContract).transfer(amountEth);      // user pays for fee
+        dpt.transferFrom(liquidityContract, burner, feeDpt); // transfer bought fee to burner
 
         emit LogBuyDptFee(msg.sender, amountEth, ethUsdRate, dptUsdRate, feeUsd);
         return amountEth;
@@ -357,14 +296,10 @@ contract CdcExchange is DSAuth, DSStop, DSMath, CdcExchangeEvents {
     */
     function takeFeeInDptFromUser(address user, uint feeDpt) internal returns (uint remainingFee) {
         uint dptUserBalance = dpt.balanceOf(user);
+        uint minDpt = min(feeDpt, dptUserBalance);              // calculate how much DPT user has to buy
 
-        // calculate how many DPT user have to buy
-        uint minDpt = min(feeDpt, dptUserBalance);
         remainingFee = sub(feeDpt, minDpt);
-
-        // transfer to contract for future burn
-        if (minDpt > 0) dpt.transferFrom(user, address(this), minDpt);
-
+        if (minDpt > 0) dpt.transferFrom(user, burner, minDpt); // DPT transfer to burner 
         return remainingFee;
     }
 
