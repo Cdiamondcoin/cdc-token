@@ -79,7 +79,7 @@ contract CdcExchangeEvents {
     );
 
     event LogAllowedToken(address indexed token, bytes4 buy, bool allowed); 
-    event LogValueChange(bytes32 indexed kind, bytes32 value, bytes32 value1); 
+    event LogValueChange(bytes32 indexed what, bytes32 value, bytes32 value1); 
 }
 
 
@@ -215,25 +215,25 @@ contract CdcExchange is DSAuth, DSStop, DSMath, CdcExchangeEvents {
         emit LogAllowedToken(token_, buySell_, allowed_);
     }
 
-    function setConfig(bytes32 kind, address value_, address value1_) public auth { setConfig(kind, b32(value_), b32(value1_)); }
-    function setConfig(bytes32 kind, address value_, bytes32 value1_) public auth { setConfig(kind, b32(value_), value1_); }
-    function setConfig(bytes32 kind, address value_, uint256 value1_) public auth { setConfig(kind, b32(value_), b32(value1_)); }
-    function setConfig(bytes32 kind, uint256 value_, address value1_) public auth { setConfig(kind, b32(value_), b32(value1_)); }
-    function setConfig(bytes32 kind, uint256 value_, bytes32 value1_) public auth { setConfig(kind, b32(value_), value1_); }
-    function setConfig(bytes32 kind, uint256 value_, uint256 value1_) public auth { setConfig(kind, b32(value_), b32(value1_)); }
+    function setConfig(bytes32 what, address value_, address value1_) public auth { setConfig(what, b32(value_), b32(value1_)); }
+    function setConfig(bytes32 what, address value_, bytes32 value1_) public auth { setConfig(what, b32(value_), value1_); }
+    function setConfig(bytes32 what, address value_, uint256 value1_) public auth { setConfig(what, b32(value_), b32(value1_)); }
+    function setConfig(bytes32 what, uint256 value_, address value1_) public auth { setConfig(what, b32(value_), b32(value1_)); }
+    function setConfig(bytes32 what, uint256 value_, bytes32 value1_) public auth { setConfig(what, b32(value_), value1_); }
+    function setConfig(bytes32 what, uint256 value_, uint256 value1_) public auth { setConfig(what, b32(value_), b32(value1_)); }
 
     /**
     * @dev Set configuration values for contract
     */
-    function setConfig(bytes32 kind, bytes32 value_, bytes32 value1_) public auth {
-        if (kind == "custodian") {
+    function setConfig(bytes32 what, bytes32 value_, bytes32 value1_) public auth {
+        if (what == "custodian") {
             custodian[addr(value_)] = addr(value1_);
 
-        } else if (kind == "profitRate") {
+        } else if (what == "profitRate") {
             profitRate = uint256(value_);
             require(profitRate <= 10 ** 18, "Profit rate out of range");
 
-        } else if (kind == "rate") {
+        } else if (what == "rate") {
             address token = addr(value_);
             uint256 value = uint256(value1_);
             require(
@@ -243,7 +243,7 @@ contract CdcExchange is DSAuth, DSStop, DSMath, CdcExchangeEvents {
             require(value > 0, "Rate must be greater than 0");
             rate[token] = value;
 
-        } else if (kind == "manualRate") {
+        } else if (what == "manualRate") {
             address token = addr(value_);
             require(
                 allow20["sell"][token] ||
@@ -251,79 +251,79 @@ contract CdcExchange is DSAuth, DSStop, DSMath, CdcExchangeEvents {
                 "Token not allowed");
             manualRate[token] = uint256(value1_) > 0;
 
-        } else if (kind == "priceFeed") {
+        } else if (what == "priceFeed") {
             require(allow20["sell"][addr(value_)] || allow20["buy"][addr(value_)], "Token not allowed");
             require(addr(value1_) != address(address(0x0)), "Wrong PriceFeed address");
             priceFeed[addr(value_)] = TrustedFeedLike(addr(value1_));
 
-        } else if (kind == "takeProfitOnlyInDpt") {
+        } else if (what == "takeProfitOnlyInDpt") {
             takeProfitOnlyInDpt = uint256(value_) > 0;
 
-        } else if (kind == "liq") {
+        } else if (what == "liq") {
             liq = addr(value_);
             require(TrustedErc20(dpt).balanceOf(liq) > 0, "Insufficient funds of DPT");
 
-        } else if (kind == "asm") {
+        } else if (what == "asm") {
             require(addr(value_) != address(0x0), "Wrong address");
             asm = TrustedAssetManagement(addr(value_));
 
-        } else if (kind == "burner") {
+        } else if (what == "burner") {
             require(addr(value_) != address(0x0), "Wrong address");
             burner = addr(value_);
 
-        } else if (kind == "cdc") {
+        } else if (what == "cdc") {
             require(addr(value_) != address(0x0), "Wrong address");
             cdc = TrustedDsToken(addr(value_));
 
-        } else if (kind == "custodian") {
+        } else if (what == "custodian") {
             require(addr(value_) != address(0x0), "Wrong address");
             custodian[addr(value_)] = addr(value1_);
 
-        } else if (kind == "fcc") {
+        } else if (what == "fcc") {
             require(addr(value_) != address(0x0), "Wrong address");
             fcc = TrustedFeeCalculator(addr(value_));
 
-        } else if (kind == "fixFee") {
+        } else if (what == "fixFee") {
             fixFee = uint256(value_);
 
-        } else if (kind == "varFee") {
+        } else if (what == "varFee") {
             varFee = uint256(value_);
 
-        } else if (kind == "decimals") {
+        } else if (what == "decimals") {
             require(addr(value_) != address(0x0), "Wrong address");
             decimals[addr(value_)] = uint8(uint256(value1_)); 
             decimalsSet[addr(value_)] = true;
 
-        } else if (kind == "wal") {
+        } else if (what == "wal") {
             require(addr(value_) != address(0x0), "Wrong address");
             wal = addr(value_);
 
-        } else if (kind == "callGas") {
+        } else if (what == "callGas") {
             callGas = uint256(value_);
 
-        } else if (kind == "dust") {
+        } else if (what == "dust") {
             dust = uint256(value_);
 
-        } else if (kind == "dpass") {
+        } else if (what == "dpass") {
             require(addr(value_) != address(0x0), "Wrong address");
             dpass = TrustedErc721(addr(value_));
 
-        } else if (kind == "dpt") {
+        } else if (what == "dpt") {
             require(addr(value_) != address(0x0), "Wrong address");
             dpt = addr(value_);
 
-        } else if (kind == "owner") {
+        } else if (what == "owner") {
             require(addr(value_) != address(0x0), "Wrong address");
             setOwner(addr(value_));
 
-        } else if (kind == "authority") {
+        } else if (what == "authority") {
             require(addr(value_) != address(0x0), "Wrong address");
             setAuthority(TrustedDSAuthority(addr(value_)));
 
         } else {
             require(false, "No such option");
         }
-        emit LogValueChange(kind, value_, value1_);
+        emit LogValueChange(what, value_, value1_);
     }
 
     /**
