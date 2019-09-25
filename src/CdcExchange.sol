@@ -78,7 +78,6 @@ contract CdcExchangeEvents {
         uint256 priceOrRate
     );
 
-    event LogAllowedToken(address indexed token, bytes4 buy, bool allowed); 
     event LogValueChange(bytes32 indexed what, bytes32 value, bytes32 value1); 
 }
 
@@ -108,7 +107,7 @@ contract CdcExchange is DSAuth, DSStop, DSMath, CdcExchangeEvents {
     uint256 public profitRate;              // the percentage of profit that is burned on all fees received. 18 decimals precision
     uint256 public callGas = 2500;           // using this much gas when Ether is transferred
     uint256 public txId;                    // Unique id of each transaction.
-    bool public takeProfitOnlyInDpt;        // If true, it takes cost + profit in DPT, if false only profit in DPT
+    bool public takeOnlyProfitInDpt;        // If true, it takes cost + profit in DPT, if false only profit in DPT
     uint256 public dust = 2;                // dust amount. Numbers below this amount are considered 0.
 
     constructor(
@@ -212,7 +211,7 @@ contract CdcExchange is DSAuth, DSStop, DSMath, CdcExchangeEvents {
         } else {
             allow721[buySell_][token_] = allowed_;
         }
-        emit LogAllowedToken(token_, buySell_, allowed_);
+        emit LogValueChange(allowed_ ? "allowToken" : "denyToken", b32(token_), buySell_); 
     }
 
     function setConfig(bytes32 what, address value_, address value1_) public auth { setConfig(what, b32(value_), b32(value1_)); }
@@ -243,6 +242,12 @@ contract CdcExchange is DSAuth, DSStop, DSMath, CdcExchangeEvents {
             require(value > 0, "Rate must be greater than 0");
             rate[token] = value;
 
+        } else if (what == "fixFee") {
+            fixFee = uint256(value_);
+
+        } else if (what == "varFee") {
+            varFee = uint256(value_);
+
         } else if (what == "manualRate") {
             address token = addr(value_);
             require(
@@ -256,8 +261,14 @@ contract CdcExchange is DSAuth, DSStop, DSMath, CdcExchangeEvents {
             require(addr(value1_) != address(address(0x0)), "Wrong PriceFeed address");
             priceFeed[addr(value_)] = TrustedFeedLike(addr(value1_));
 
-        } else if (what == "takeProfitOnlyInDpt") {
-            takeProfitOnlyInDpt = uint256(value_) > 0;
+        } else if (what == "fixFee") {
+            fixFee = uint256(value_);
+
+        } else if (what == "varFee") {
+            varFee = uint256(value_);
+
+        } else if (what == "takeOnlyProfitInDpt") {
+            takeOnlyProfitInDpt = uint256(value_) > 0;
 
         } else if (what == "liq") {
             liq = addr(value_);
@@ -282,12 +293,6 @@ contract CdcExchange is DSAuth, DSStop, DSMath, CdcExchangeEvents {
         } else if (what == "fcc") {
             require(addr(value_) != address(0x0), "Wrong address");
             fcc = TrustedFeeCalculator(addr(value_));
-
-        } else if (what == "fixFee") {
-            fixFee = uint256(value_);
-
-        } else if (what == "varFee") {
-            varFee = uint256(value_);
 
         } else if (what == "decimals") {
             require(addr(value_) != address(0x0), "Wrong address");
@@ -568,7 +573,7 @@ contract CdcExchange is DSAuth, DSStop, DSMath, CdcExchangeEvents {
         uint amt;
         address token;
 
-        feeTaken = takeProfitOnlyInDpt ? wmul(fee, profitRate) : fee; 
+        feeTaken = takeOnlyProfitInDpt ? wmul(fee, profitRate) : fee; 
         feeTaken = takeFeeInDptFromUser(feeTaken);
         
         if (fee - feeTaken > dust && fee - feeTaken < fee) { //if we could not take all fees from user DPT (with round-off errors considered)
@@ -638,7 +643,7 @@ contract CdcExchange is DSAuth, DSStop, DSMath, CdcExchangeEvents {
 
             wmul(fee + feeTaken, profitRate),                   // total profit due
 
-            takeProfitOnlyInDpt ?                               // profit payed already
+            takeOnlyProfitInDpt ?                               // profit payed already
                 feeTaken :
                 wmul(feeTaken, profitRate)
         );
@@ -685,7 +690,7 @@ contract CdcExchange is DSAuth, DSStop, DSMath, CdcExchangeEvents {
         );
 
         if (minDpt > dust) {
-            if (takeProfitOnlyInDpt) {
+            if (takeOnlyProfitInDpt) {
                 sendToken(dpt, msg.sender, burner, minDpt); // only profit is put to the burner
             } else {
                 sendToken(dpt, msg.sender, burner, wmul(minDpt, profitRate));
