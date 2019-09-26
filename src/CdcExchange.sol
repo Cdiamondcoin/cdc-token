@@ -46,7 +46,6 @@ contract TrustedDsToken {
 contract TrustedAssetManagement {
     function notifyTransferFrom(TrustedErc721 erc721, address src, address dst, uint256 id721) external;
     function getPrice(TrustedErc721 erc721, uint256 id721) external view returns(uint256);
-    function balanceOf(TrustedErc20 token, 
 }
 
 
@@ -111,8 +110,9 @@ contract CdcExchange is DSAuth, DSStop, DSMath, CdcExchangeEvents {
     uint256 public callGas = 2500;          // using this much gas when Ether is transferred
     uint256 public txId;                    // Unique id of each transaction.
     bool public takeProfitOnlyInDpt = true; // If true, it takes cost + profit in DPT, if false only profit in DPT
-    uint256 public dust = 10000;            // Numbers below this amount are considered 0. Can only be used 
-                                            // next to 18 decimal precisions numbers.
+    uint256 public dust = 10000;            // Numbers below this amount are considered 0. Can only be used ... 
+                                            // ... along with 18 decimal precisions numbers.
+    bool locked;                            // protect against reentrancy attacks
 
     constructor(
         address cdc_,
@@ -156,6 +156,13 @@ contract CdcExchange is DSAuth, DSStop, DSMath, CdcExchangeEvents {
         setConfig("wal", wal_, "");
     }
 
+    modifier nonReentrant {
+        require(!locked, "Reentrancy detected.");
+        locked = true;
+        _;
+        locked = false;
+    }
+
     /**
     * @dev Fallback function to buy tokens.
     */
@@ -172,7 +179,7 @@ contract CdcExchange is DSAuth, DSStop, DSMath, CdcExchangeEvents {
         uint256 sellAmtOrId, 
         address buyToken,
         uint256 buyAmtOrId
-    ) public payable stoppable {
+    ) public payable stoppable nonReentrant {
         uint valueBuy;
         uint valueSell;
         uint fee;
@@ -181,7 +188,6 @@ contract CdcExchange is DSAuth, DSStop, DSMath, CdcExchangeEvents {
         updateRates(sellToken, buyToken);
 
         (valueBuy, valueSell) = getValues(sellToken, sellAmtOrId, buyToken, buyAmtOrId); 
-
 
         fee = calculateFee(msg.sender, valueBuy, sellToken, sellAmtOrId, buyToken, buyAmtOrId);
         
@@ -192,7 +198,7 @@ contract CdcExchange is DSAuth, DSStop, DSMath, CdcExchangeEvents {
         
         }
 
-        sellTokens(valueSell, valueBuy, sellToken, sellAmtOrId, buyToken, buyAmtOrId);
+        transferTokens(valueSell, valueBuy, sellToken, sellAmtOrId, buyToken, buyAmtOrId);
 
         txId++;
         
@@ -214,21 +220,37 @@ contract CdcExchange is DSAuth, DSStop, DSMath, CdcExchangeEvents {
         if (erc_ == "ERC20") {
             if (buySell_ == "buy") { 
                 canBuyErc20[token_] = allowed_;
-                emit LogConfigChange(allowed_ ? "canBuy" : "canNotBuy", token, erc_);
+                
+                emit LogConfigChange(
+                    allowed_ ? bytes32("canBuyErc20") : bytes32("canNotBuyErc20"),
+                    b32(token_),
+                    bytes32(""));
+
             } else { 
                 canSellErc20[token_] = allowed_; 
-                emit LogConfigChange(allowed_ ? "canSell" : "canNotSell", token, erc_);
+
+                emit LogConfigChange(
+                    allowed_ ? bytes32("canSellErc20") : bytes32("canNotSellErc20"),
+                    b32(token_),
+                    bytes32(""));
             }
         } else {
             if (buySell_ == "buy") { 
                 canBuyErc721[token_] = allowed_;
-                emit LogConfigChange(allowed_ ? "canBuy" : "canNotBuy", token, erc_);
+
+                emit LogConfigChange(
+                    allowed_ ? bytes32("canBuyErc721") : bytes32("canNotBuyErc721"),
+                    b32(token_),
+                    bytes32(""));
+
             } else { 
                 canSellErc721[token_] = allowed_; 
-                emit LogConfigChange(allowed_ ? "canSell" : "canNotSell", token, erc_);
+                emit LogConfigChange(
+                    allowed_ ? bytes32("canSellErc721") : bytes32("canNotSellErc721"),
+                    b32(token_),
+                    bytes32(""));
             }
         }
-        emit LogValueChange(allowed_ ? "allowToken" : "denyToken", b32(token_), buySell_); 
     }
 
     function setConfig(bytes32 what, address value_, address value1_) public auth { setConfig(what, b32(value_), b32(value1_)); }
@@ -284,8 +306,8 @@ contract CdcExchange is DSAuth, DSStop, DSMath, CdcExchangeEvents {
         } else if (what == "varFee") {
             varFee = uint256(value_);
 
-        } else if (what == "takeOnlyProfitInDpt") {
-            takeOnlyProfitInDpt = uint256(value_) > 0;
+        } else if (what == "takeProfitOnlyInDpt") {
+            takeProfitOnlyInDpt = uint256(value_) > 0;
 
         } else if (what == "liq") {
             liq = addr(value_);
@@ -463,7 +485,7 @@ contract CdcExchange is DSAuth, DSStop, DSMath, CdcExchangeEvents {
         uint buyAmt = buyAmtOrId;
         uint sellAmt = sellAmtOrId;
 
-        require(buyToken != 0xee, "Ether can not be sold here");        // we can not sell Ether with this smart contract currently
+        require(buyToken != address(0xee), "Ether can not be sold here");        // we can not sell Ether with this smart contract currently
 
         if (canSellErc20[sellToken]) {                                  // if sellToken is a valid ERC20 token
 
@@ -562,13 +584,13 @@ contract CdcExchange is DSAuth, DSStop, DSMath, CdcExchangeEvents {
             require(false, "Token not allowed to be bought");           // token can not be bought here
         }
 
-        require(valueBuy - dust <= valueSell, "Not enough funds");
+        require(valueBuy - dust <= valueSell, "Not enough funds");      // buy value must be less or equal to sell value
     }
 
     /**
-    * @dev Sell tokens of user
+    * @dev Transfer sellToken from user and buyToken to user
     */
-    function sellTokens(
+    function transferTokens(
         uint256 valueSell,                                              // sell value after fee was subtracted
         uint256 valueBuy,                                               // buy value after fee was subtracted
         address sellToken, 
@@ -591,32 +613,42 @@ contract CdcExchange is DSAuth, DSStop, DSMath, CdcExchangeEvents {
 
         if (canSellErc20[sellToken]) {                                  // if sellToken is a valid ERC20 token
 
-            sendToken(sellToken, msg.sender,                            // send token or Ether
+            sendToken(sellToken, msg.sender,                            // send token or Ether from user to custodian
                     custodian[sellToken], sellValueToken);
 
         }  else {                                                       // if sellToken is a valid ERC721 token
             
-            TrustedErc721(sellToken)                                    // 
+            TrustedErc721(sellToken)                                    // transfer ERC721 token from user to custodian
             .transferFrom(
                 msg.sender, 
                 custodian[sellToken], 
                 sellAmtOrId);
 
-            asm.notifyTransferFrom(
+            asm.notifyTransferFrom(                                     // notify Asset Management contract about transfer
                 TrustedErc721(sellToken), 
                 msg.sender,
                 custodian[sellToken],
                 sellAmtOrId);
         }
 
-        if (canBuyErc20[buyToken]) {
+        if (canBuyErc20[buyToken]) {                                    // if buyToken is a valid ERC20 token
             
-            sendToken(buyToken, custodian[buyToken], msg.sender, buyValueToken);
+            sendToken(buyToken, custodian[buyToken],                    // send buyToken from custodian to user
+                      msg.sender, buyValueToken);
         
-        }  else {
+        }  else {                                                       // if buyToken is a valid ERC721 token
         
-            TrustedErc721(buyToken).transferFrom(custodian[buyToken], msg.sender, buyAmtOrId);
-            asm.notifyTransferFrom(TrustedErc721(buyToken), custodian[buyToken], msg.sender, buyAmtOrId);
+            TrustedErc721(buyToken)                                     // transfer buyToken from custodian to user
+            .transferFrom(
+                custodian[buyToken],
+                msg.sender,
+                buyAmtOrId);
+
+            asm.notifyTransferFrom(                                     // nofify Asset Management about transfer
+                TrustedErc721(buyToken),
+                custodian[buyToken],
+                msg.sender,
+                buyAmtOrId);
         }
     }
 
@@ -648,10 +680,11 @@ contract CdcExchange is DSAuth, DSStop, DSMath, CdcExchangeEvents {
         address token;
         address src;
 
-        feeTaken = takeOnlyProfitInDpt ? wmul(fee, profitRate) : fee; 
+        feeTaken = takeProfitOnlyInDpt ? wmul(fee, profitRate) : fee; 
         feeTaken = takeFeeInDptFromUser(feeTaken);
         
-        if (fee - feeTaken > dust && fee - feeTaken < fee) { // if we could not take all fees from user DPT (with round-off errors considered)
+        if (fee - feeTaken > dust && fee - feeTaken < fee) {// if we could not take all fees from user ...
+                                                            // ... DPT (with round-off errors considered)
             fee = sub(fee, feeTaken);
 
             if (canSellErc20[sellToken]) {
@@ -719,7 +752,7 @@ contract CdcExchange is DSAuth, DSStop, DSMath, CdcExchangeEvents {
 
             wmul(fee + feeTaken, profitRate),                   // total profit due
 
-            takeOnlyProfitInDpt ?                               // profit payed already
+            takeProfitOnlyInDpt ?                               // profit payed already
                 feeTaken :
                 wmul(feeTaken, profitRate)
         );
@@ -763,7 +796,7 @@ contract CdcExchange is DSAuth, DSStop, DSMath, CdcExchangeEvents {
                             rate[dpt]
         );
         
-        uint minDpt = min(feeDpt, dptUser);
+        uint minDpt = min(feeDpt, dptUser);                         // get the minimum of fees to be paid and user balances
         
         feeTaken = wmul(                                            // fee in terms of base currency 
                         toDecimals(minDpt, getDecimals(dpt), 18),
