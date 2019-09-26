@@ -90,11 +90,11 @@ contract CdcExchange is DSAuth, DSStop, DSMath, CdcExchangeEvents {
     mapping(address => uint256) private rate;               // exchange rate for a token
     mapping(address => bool) public manualRate;             // manualRate is allowed for a token (if feed invalid)
     mapping(address => TrustedFeedLike) public priceFeed;   // price feed address for token  
-    mapping(bytes4 => mapping(address => bool)) public allow20; // stores allowed ERC20 tokens to sell and buy 
-    mapping(bytes4 => mapping(address => bool)) public allow721;// stores allowed ERC721 tokens to sell and buy 
-    mapping(address => uint8) public decimals;                  // stores decimals for each ERC20 token
-    mapping(address => bool) public decimalsSet;                // stores if decimals were set for ERC20 token 
-    mapping(address => address) public custodian;               // custodian that holds a token
+    mapping(bytes4 => mapping(address => bool)) public allow20;     // stores allowed ERC20 tokens to sell and buy 
+    mapping(bytes4 => mapping(address => bool)) public allow721;    // stores allowed ERC721 tokens to sell and buy 
+    mapping(address => uint8) public decimals;                      // stores decimals for each ERC20 token
+    mapping(address => bool) public decimalsSet;                    // stores if decimals were set for ERC20 token 
+    mapping(address => address) public custodian;                   // custodian that holds a token
 
     TrustedFeeCalculator public fcc;        // fee calculator contract
 
@@ -105,7 +105,7 @@ contract CdcExchange is DSAuth, DSStop, DSMath, CdcExchangeEvents {
     uint256 public fixFee;                  // Fixed part of fee charged for buying 18 decimals precision in base currency
     uint256 public varFee;                  // Variable part of fee charged for buying 18 decimals precision in base currency
     uint256 public profitRate;              // the percentage of profit that is burned on all fees received. 18 decimals precision
-    uint256 public callGas = 2500;           // using this much gas when Ether is transferred
+    uint256 public callGas = 2500;          // using this much gas when Ether is transferred
     uint256 public txId;                    // Unique id of each transaction.
     bool public takeOnlyProfitInDpt;        // If true, it takes cost + profit in DPT, if false only profit in DPT
     uint256 public dust = 2;                // dust amount. Numbers below this amount are considered 0.
@@ -178,7 +178,6 @@ contract CdcExchange is DSAuth, DSStop, DSMath, CdcExchangeEvents {
 
         (valueBuy, valueSell) = getValues(sellToken, sellAmtOrId, buyToken, buyAmtOrId); 
 
-        require(valueBuy - dust <= valueSell, "Not enough funds");
 
         fee = calculateFee(msg.sender, valueBuy, sellToken, sellAmtOrId, buyToken, buyAmtOrId);
         
@@ -365,16 +364,16 @@ contract CdcExchange is DSAuth, DSStop, DSMath, CdcExchangeEvents {
     }
 
     /**
-    * @dev Adjusts a number to decimals
+    * @dev Adjusts a number from one precision to another
     */
     function toDecimals(uint256 amt, uint8 srcDec, uint8 dstDec) public pure returns (uint256) {
-        if (srcDec == dstDec) return amt;
-        if (srcDec < dstDec) return mul(amt, 10 ** uint256(dstDec - srcDec));
-        return amt / 10 ** uint256(srcDec - dstDec);
+        if (srcDec == dstDec) return amt;                                       // no change
+        if (srcDec < dstDec) return mul(amt, 10 ** uint256(dstDec - srcDec));   // add zeros to the right
+        return amt / 10 ** uint256(srcDec - dstDec);                            // remove digits 
     }
 
     /**
-    * @dev Ability to delegate fee calculating to external contract.
+    * @dev Calculate fee locally or using an external smart contract
     * @return the fee amount in USD
     */
     function calculateFee(
@@ -386,9 +385,15 @@ contract CdcExchange is DSAuth, DSStop, DSMath, CdcExchangeEvents {
         uint256 buyAmtOrId
     ) public view returns (uint) {
         if (fcc == TrustedFeeCalculator(0)) {
-            return fixFee + wmul(varFee, value);
+            return fixFee + wmul(varFee, value);                        // calculate proportional fee locally
         } else {
-            return fcc.calculateFee(sender, value, sellToken, sellAmtOrId, buyToken, buyAmtOrId);
+            return fcc.calculateFee(                                    // calculate fee using external smart contract
+                sender, 
+                value, 
+                sellToken,
+                sellAmtOrId,
+                buyToken,
+                buyAmtOrId);
         }
     }
 
@@ -399,13 +404,17 @@ contract CdcExchange is DSAuth, DSStop, DSMath, CdcExchangeEvents {
     function getRate(address token_) public view returns (uint rate_) {
         bool feedValid;
         bytes32 usdRateBytes;
-        require(TrustedFeedLike(address(0x0)) != priceFeed[token_], "No price feed for token");
 
-        (usdRateBytes, feedValid) = priceFeed[token_].peek();          // receive DPT/USD price
-        if (feedValid) {                                               // if feed is valid, load DPT/USD rate from it
+        require(
+            TrustedFeedLike(address(0x0)) != priceFeed[token_],         // require token to have a price feed
+            "No price feed for token");
+
+        (usdRateBytes, feedValid) = priceFeed[token_].peek();           // receive DPT/USD price
+
+        if (feedValid) {                                                // if feed is valid, load DPT/USD rate from it
             rate_ = uint(usdRateBytes);
         } else {
-            require(manualRate[token_], "Manual rate not allowed");    // if feed invalid revert if manualEthRate is NOT allowed
+            require(manualRate[token_], "Manual rate not allowed");     // if feed invalid revert if manualEthRate is NOT allowed
             rate_ = rate[token_];
         }
     }
@@ -500,6 +509,8 @@ contract CdcExchange is DSAuth, DSStop, DSMath, CdcExchangeEvents {
         } else {
             require(false, "Token not allowed to be bought");
         }
+
+        require(valueBuy - dust <= valueSell, "Not enough funds");
     }
 
     /**
