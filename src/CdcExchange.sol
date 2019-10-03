@@ -563,7 +563,7 @@ contract CdcExchange is DSAuth, DSStop, DSMath, CdcExchangeEvents {
         uint maxT; 
 
         require(buyToken != address(0xee), "We don't sell Ether");      // we can not sell Ether with this smart contract currently
-        require(sellToken == address(0xee) || msg.value > 0,            // we don't accept ETH if user wants to sell other token
+        require(sellToken == address(0xee) || msg.value == 0,            // we don't accept ETH if user wants to sell other token
                 "Really want to send Ether?");       
 
         if (canSellErc20[sellToken]) {                                  // if sellToken is a valid ERC20 token
