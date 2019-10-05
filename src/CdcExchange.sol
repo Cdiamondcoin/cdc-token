@@ -47,13 +47,15 @@ contract TrustedAssetManagement {
     function notifyTransferFrom(address token, address src, address dst, uint256 id721) external;
     function getPrice(TrustedErc721 erc721, uint256 id721) external view returns(uint256);
     function getAmtForSale(TrustedErc20 token) external view returns(uint256);
-    function isOwnerOf(address buyToken) external view returns(bool);
     function sendToken(address token, address dst, uint256 value) external;
+    function isOwnerOf(address buyToken) external view returns(bool);
+
 }
 
 
 contract TrustedErc721 {
     function transferFrom(address src, address to, uint256 amt) external;    
+    function ownerOf(uint256 tokenId) external view returns (address); 
 }
 
 
@@ -112,8 +114,6 @@ contract CdcExchange is DSAuth, DSStop, DSMath, CdcExchangeEvents {
     mapping(address => bool) public decimalsSet;            // stores if decimals were set for ERC20 token 
     mapping(address => address) public custodian20;         // custodian that holds an ERC20 token for Exchange
     mapping(address => bool) public handledByAsm;           // defines if token is managed by Asset Management
-    mapping(address => mapping(uint256 => address))         // custodian that holds an ERC721 token for Exchange
-        public custodian721;           
 
     TrustedFeeCalculator public fca;        // fee calculator contract
 
@@ -130,6 +130,7 @@ contract CdcExchange is DSAuth, DSStop, DSMath, CdcExchangeEvents {
     uint256 public dust = 10000;            // Numbers below this amount are considered 0. Can only be used ... 
                                             // ... along with 18 decimal precisions numbers.
     bool locked;                            // protect against reentrancy attacks
+    address eth = address(0xee);            // to handle ether the same way as tokens we associate a fake address to it
 
     constructor(
         address cdc_,
@@ -153,18 +154,19 @@ contract CdcExchange is DSAuth, DSStop, DSMath, CdcExchangeEvents {
         setConfig("canBuyErc20", dpt_, true);
         setConfig("canSellErc20", cdc_, true);
         setConfig("canBuyErc20", cdc_, true);
-        setConfig("canSellErc20", address(0xee), true);
+        setConfig("canSellErc20", eth, true);
         setConfig("canBuyErc721", dpass_, true);
+        setConfig("canSellErc721", dpass_, true);
         setConfig("decimals", dpt_, 18);
         setConfig("decimals", cdc_, 18);
-        setConfig("decimals", address(0xee), 18);
+        setConfig("decimals", eth, 18);
         setConfig("dpt", dpt_, "");
         setConfig("cdc", cdc_, "");
         setConfig("dpass", dpass_, "");
         setConfig("handledByAsm", cdc_, true);
         setConfig("handledByAsm", dpass_, true);
         setConfig("priceFeed", dpt_, dptPriceFeed_);
-        setConfig("priceFeed", address(0xee), ethPriceFeed_);
+        setConfig("priceFeed", eth, ethPriceFeed_);
         setConfig("priceFeed", cdc_, cdcPriceFeed_);
         setConfig("liq", liq_, "");
         setConfig("burner", burner_, "");
@@ -186,7 +188,7 @@ contract CdcExchange is DSAuth, DSStop, DSMath, CdcExchangeEvents {
     * @dev Fallback function to buy tokens.
     */
     function () external payable {
-        buyTokensWithFee(address(0xee), msg.value, address(cdc), uint(-1));
+        buyTokensWithFee(eth, msg.value, address(cdc), uint(-1));
     }
 
     /**
@@ -203,166 +205,233 @@ contract CdcExchange is DSAuth, DSStop, DSMath, CdcExchangeEvents {
         uint sellV;
         uint feeV;
 
-        updateRates(sellToken, buyToken);
+        updateRates(sellToken, buyToken);               // update currency rates
 
-        (buyV, sellV) = getValues(sellToken, sellAmtOrId, buyToken, buyAmtOrId);    // calculate highest possible buy and sell values (here they might not match) 
+        (buyV, sellV) = getValues(                      // calculate highest possible buy and sell values (here they might not match) 
+            sellToken, 
+            sellAmtOrId, 
+            buyToken, 
+            buyAmtOrId);    
 
-        feeV = calculateFee(msg.sender, min(buyV, sellV), sellToken, sellAmtOrId, buyToken, buyAmtOrId);
+        feeV = calculateFee(                            // calculate fee user has to pay for exchange
+            msg.sender, 
+            min(buyV, sellV),
+            sellToken,
+            sellAmtOrId,
+            buyToken,
+            buyAmtOrId);
 
-        if (feeV > 0) {
+        (sellV, buyV) = takeFee(                        // takes the calculated fee from user in DPT or sellToken ...
+            feeV,                                       // ... calculates final sell and buy values (in base currency)
+            sellV, 
+            buyV,
+            sellToken,
+            sellAmtOrId,
+            buyToken,
+            buyAmtOrId);
 
-            (sellV, buyV) = 
-                takeFee(feeV, sellV, buyV, sellToken, sellAmtOrId, buyToken, buyAmtOrId);
-        }
-
-        transferTokens(sellV, buyV, sellToken, sellAmtOrId, buyToken, buyAmtOrId, feeV);
+        transferTokens(                                 // transfers tokens to user and seller
+            sellV, 
+            buyV, 
+            sellToken, 
+            sellAmtOrId, 
+            buyToken, 
+            buyAmtOrId, 
+            feeV);
     }
 
-    function setConfig(bytes32 what_, address value_, address value1_) public auth { setConfig(what_, b32(value_), b32(value1_), ""); }
-    function setConfig(bytes32 what_, address value_, bytes32 value1_) public auth { setConfig(what_, b32(value_), value1_, ""); }
-    function setConfig(bytes32 what_, address value_, uint256 value1_) public auth { setConfig(what_, b32(value_), b32(value1_), ""); }
-    function setConfig(bytes32 what_, uint256 value_, address value1_) public auth { setConfig(what_, b32(value_), b32(value1_), ""); }
-    function setConfig(bytes32 what_, uint256 value_, bytes32 value1_) public auth { setConfig(what_, b32(value_), value1_, ""); }
-    function setConfig(bytes32 what_, uint256 value_, uint256 value1_) public auth { setConfig(what_, b32(value_), b32(value1_), ""); }
-    function setConfig(bytes32 what_, address value_, bool value1_) public auth { setConfig(what_, b32(value_), b32(value1_), ""); }
-    function setConfig(bytes32 what_, address value_, uint256 value1_, address value2_) public auth { setConfig(what_, b32(value_), b32(value1_), b32(value2_)); }
+    function setConfig(bytes32 what_, address value_, address value1_) public auth { setConfig(what_, b32(value_), b32(value1_)); }
+    function setConfig(bytes32 what_, address value_, bytes32 value1_) public auth { setConfig(what_, b32(value_), value1_); }
+    function setConfig(bytes32 what_, address value_, uint256 value1_) public auth { setConfig(what_, b32(value_), b32(value1_)); }
+    function setConfig(bytes32 what_, uint256 value_, address value1_) public auth { setConfig(what_, b32(value_), b32(value1_)); }
+    function setConfig(bytes32 what_, uint256 value_, bytes32 value1_) public auth { setConfig(what_, b32(value_), value1_); }
+    function setConfig(bytes32 what_, uint256 value_, uint256 value1_) public auth { setConfig(what_, b32(value_), b32(value1_)); }
+    function setConfig(bytes32 what_, address value_, bool value1_) public auth { setConfig(what_, b32(value_), b32(value1_)); }
 
     /**
     * @dev Set configuration values for contract
     */
-    function setConfig(bytes32 what_, bytes32 value_, bytes32 value1_, bytes32 value2_) public auth {
-        if (what_ == "custodian721") {
-            address token = addr(value_);
-            uint id = uint(value1_);
-            address cust = addr(value2_);
-            require(token != address(0x0), "Wrong address");
-            require(cust != address(0x0), "Wrong address");
-            require(id != 0, "Id should not be zero");
-            custodian721[token][id] = cust;
-
-        } else if (what_ == "profitRate") {
+    function setConfig(bytes32 what_, bytes32 value_, bytes32 value1_) public auth {
+        if (what_ == "profitRate") {
+            
             profitRate = uint256(value_);
+
             require(profitRate <= 10 ** 18, "Profit rate out of range");
 
         } else if (what_ == "rate") {
             address token = addr(value_);
             uint256 value = uint256(value1_);
+            
             require(
                 canSellErc20[token] ||
                 canBuyErc20[token],
                 "Token not allowed rate");
+            
             require(value > 0, "Rate must be greater than 0");
+            
             rate[token] = value;
 
         } else if (what_ == "fixFee") {
+            
             fixFee = uint256(value_);
 
         } else if (what_ == "varFee") {
+            
             varFee = uint256(value_);
 
         } else if (what_ == "manualRate") {
+            
             address token = addr(value_);
+            
             require(
                 canSellErc20[token] ||
                 canBuyErc20[token],
                 "Token not allowed manualRate");
+            
             manualRate[token] = uint256(value1_) > 0;
 
         } else if (what_ == "priceFeed") {
+            
             require(canSellErc20[addr(value_)] || canBuyErc20[addr(value_)], "Token not allowed priceFeed");
+            
             require(addr(value1_) != address(address(0x0)), "Wrong PriceFeed address");
+            
             priceFeed[addr(value_)] = TrustedFeedLike(addr(value1_));
 
         } else if (what_ == "fixFee") {
+            
             fixFee = uint256(value_);
 
         } else if (what_ == "varFee") {
+            
             varFee = uint256(value_);
 
         } else if (what_ == "takeProfitOnlyInDpt") {
+            
             takeProfitOnlyInDpt = uint256(value_) > 0;
 
         } else if (what_ == "liq") {
+            
             liq = addr(value_);
+            
             require(liq != address(0x0), "Wrong address");
+            
             require(TrustedErc20(dpt).balanceOf(liq) > 0,
                     "Insufficient funds of DPT");
 
         } else if (what_ == "handledByAsm") {
+            
             address token = addr(value_);
+            
             require(canBuyErc20[token] || canBuyErc721[token], "Token not allowed (handledByAsm)");
-            //require(asm.isOwnerOf(token), "Token not handled by ASM.");
+
             handledByAsm[token] = uint256(value1_) > 0;
+        
         } else if (what_ == "asm") {
+        
             require(addr(value_) != address(0x0), "Wrong address");
+            
             asm = TrustedAssetManagement(addr(value_));
 
         } else if (what_ == "burner") {
+            
             require(addr(value_) != address(0x0), "Wrong address");
+            
             burner = address(uint160(addr(value_)));
 
         } else if (what_ == "cdc") {
+            
             require(addr(value_) != address(0x0), "Wrong address");
+            
             cdc = TrustedDsToken(addr(value_));
 
         } else if (what_ == "fca") {
+            
             require(addr(value_) != address(0x0), "Wrong address");
+            
             fca = TrustedFeeCalculator(addr(value_));
 
         } else if (what_ == "custodian20") {
+            
             require(addr(value_) != address(0x0), "Wrong address");
+            
             custodian20[addr(value_)] = addr(value1_);
 
         } else if (what_ == "decimals") {
+            
             require(addr(value_) != address(0x0), "Wrong address");
+            
             decimals[addr(value_)] = uint8(uint256(value1_)); 
+            
             decimalsSet[addr(value_)] = true;
 
         } else if (what_ == "wal") {
+            
             require(addr(value_) != address(0x0), "Wrong address");
+            
             wal = address(uint160(addr(value_)));
 
         } else if (what_ == "callGas") {
+            
             callGas = uint256(value_);
 
         } else if (what_ == "dust") {
+            
             dust = uint256(value_);
 
         } else if (what_ == "canBuyErc20") {
+            
             require(addr(value_) != address(0x0), "Wrong address");
+            
             canBuyErc20[addr(value_)] = uint(value1_) > 0;
 
         } else if (what_ == "canSellErc20") {
+            
             require(addr(value_) != address(0x0), "Wrong address");
+            
             canSellErc20[addr(value_)] = uint(value1_) > 0;
 
         } else if (what_ == "canBuyErc721") {
+            
             require(addr(value_) != address(0x0), "Wrong address");
+            
             canBuyErc721[addr(value_)] = uint(value1_) > 0;
 
         } else if (what_ == "canSellErc721") {
+            
             require(addr(value_) != address(0x0), "Wrong address");
+            
             canSellErc721[addr(value_)] = uint(value1_) > 0;
 
         } else if (what_ == "dpass") {
+            
             require(addr(value_) != address(0x0), "Wrong address");
+            
             dpass = TrustedErc721(addr(value_));
 
         } else if (what_ == "dpt") {
+            
             require(addr(value_) != address(0x0), "Wrong address");
+            
             dpt = addr(value_);
 
         } else if (what_ == "owner") {
+            
             require(addr(value_) != address(0x0), "Wrong address");
+            
             setOwner(addr(value_));
 
         } else if (what_ == "authority") {
+            
             require(addr(value_) != address(0x0), "Wrong address");
+            
             setAuthority(TrustedDSAuthority(addr(value_)));
 
         } else {
+            
             require(false, "No such option");
         }
+        
         emit LogConfigChange(what_, value_, value1_);
     }
 
@@ -416,13 +485,6 @@ contract CdcExchange is DSAuth, DSStop, DSMath, CdcExchangeEvents {
     } 
 
     /**
-    * @dev Get the custodian of ERC721 token.
-    */
-    function getCustodian721(address token, uint256 id) public view returns(address) {
-        return custodian721[token][id]; 
-    } 
-
-    /**
     * @dev Convert address to bytes32
     * @param a_ address that is converted to bytes32
     * @return bytes32 conversion of address
@@ -468,8 +530,11 @@ contract CdcExchange is DSAuth, DSStop, DSMath, CdcExchangeEvents {
     * @dev Adjusts a number from one precision to another
     */
     function toDecimals(uint256 amt_, uint8 srcDec_, uint8 dstDec_) public pure returns (uint256) {
+
         if (srcDec_ == dstDec_) return amt_;                                        // no change
+        
         if (srcDec_ < dstDec_) return mul(amt_, 10 ** uint256(dstDec_ - srcDec_));  // add zeros to the right
+        
         return amt_ / 10 ** uint256(srcDec_ - dstDec_);                             // remove digits 
     }
 
@@ -485,9 +550,13 @@ contract CdcExchange is DSAuth, DSStop, DSMath, CdcExchangeEvents {
         address buyToken_,
         uint256 buyAmtOrId_
     ) public view returns (uint256) {
+
         if (fca == TrustedFeeCalculator(0)) {
+        
             return fixFee + wmul(varFee, value_);                        // calculate proportional fee locally
+        
         } else {
+        
             return fca.calculateFee(                                    // calculate fee using external smart contract
                 sender_, 
                 value_, 
@@ -517,9 +586,13 @@ contract CdcExchange is DSAuth, DSStop, DSMath, CdcExchangeEvents {
         (usdRateBytes, feedValid) = priceFeed[token_].peek();           // receive DPT/USD price
 
         if (feedValid) {                                                // if feed is valid, load DPT/USD rate from it
+
             rate_ = uint(usdRateBytes);
+        
         } else {
+        
             require(manualRate[token_], "Manual rate not allowed");     // if feed invalid revert if manualEthRate is NOT allowed
+            
             rate_ = rate[token_];
         }
     }
@@ -562,13 +635,13 @@ contract CdcExchange is DSAuth, DSStop, DSMath, CdcExchangeEvents {
         uint buyAmtT = buyAmtOrId;
         uint maxT; 
 
-        require(buyToken != address(0xee), "We don't sell Ether");      // we can not sell Ether with this smart contract currently
-        require(sellToken == address(0xee) || msg.value == 0,            // we don't accept ETH if user wants to sell other token
+        require(buyToken != eth, "We don't sell Ether");                // we can not sell Ether with this smart contract currently
+        require(sellToken == eth || msg.value == 0,                     // we don't accept ETH if user wants to sell other token
                 "Really want to send Ether?");       
 
         if (canSellErc20[sellToken]) {                                  // if sellToken is a valid ERC20 token
 
-            maxT = sellToken == address(0xee) ? 
+            maxT = sellToken == eth ? 
                 msg.value :
                 min(                                                
                     TrustedErc20(sellToken).balanceOf(msg.sender), 
@@ -578,27 +651,27 @@ contract CdcExchange is DSAuth, DSStop, DSMath, CdcExchangeEvents {
             require(maxT > 0, "Please approve us.");
 
             require(
-                sellToken == address(0xee) ||                           // disregard Ether 
+                sellToken == eth ||                                     // disregard Ether 
                 sellAmtOrId == uint(-1) ||                              // disregard uint(-1) as it has a special meaning
-                sellAmtOrId <= maxT,                                     // sellAmtOrId should be less then sellToken available to this contract
+                sellAmtOrId <= maxT,                                    // sellAmtOrId should be less then sellToken available to this contract
                 "Sell amount exceeds allowance");
 
             require(
-                sellToken != address(0xee) ||                           // regard Ether only
+                sellToken != eth ||                                     // regard Ether only
                 sellAmtOrId == uint(-1) ||                              // disregard uint(-1) as it has a special meaning
                 sellAmtOrId <= msg.value,                               // sellAmtOrId sold should be less than the Ether we received from user
                 "Sell amount exceeds Ether value");
             
-            if (sellAmtT == uint(-1)) {                                  // if user wants to sell maxTimum possible
+            if (sellAmtT == uint(-1)) {                                 // if user wants to sell maxTimum possible
 
                 sellAmtT = maxT;
             }
 
-            sellV = wmulV(sellAmtT, rate[sellToken], sellToken);     // sell value in base currency
+            sellV = wmulV(sellAmtT, rate[sellToken], sellToken);        // sell value in base currency
 
         } else if (canSellErc721[sellToken]) {                          // if sellToken is a valid ERC721 token  
 
-            sellV = asm.getPrice(TrustedErc721(buyToken), sellAmtOrId);  // get price from Asset Management
+            sellV = asm.getPrice(TrustedErc721(buyToken), sellAmtOrId); // get price from Asset Management
 
         } else {
 
@@ -608,7 +681,7 @@ contract CdcExchange is DSAuth, DSStop, DSMath, CdcExchangeEvents {
         
         if (canBuyErc20[buyToken]) {                                    // if buyToken is a valid ERC20 token
 
-            maxT = handledByAsm[buyToken] ?                              // set buy amount to maxT possible
+            maxT = handledByAsm[buyToken] ?                             // set buy amount to maxT possible
                 asm.getAmtForSale(TrustedErc20(buyToken)) :             // if managed by asset management get available
                 min(                                                    // if not managed by asset management get maxT available 
                     TrustedErc20(buyToken).balanceOf(
@@ -619,25 +692,24 @@ contract CdcExchange is DSAuth, DSStop, DSMath, CdcExchangeEvents {
             require(maxT > 0, "0 token is for sale");
 
             require(                                                    // require token's buy amount to be less or equal than avaulable to us 
-                sellToken == address(0xee) ||                            // disregard Ether
+                sellToken == eth ||                                     // disregard Ether
                 buyAmtOrId == uint(-1) ||                               // disregard uint(-1) as it has a special meaning
-                buyAmtOrId <= maxT,                                      // amount must be less or equal that maxT available
+                buyAmtOrId <= maxT,                                     // amount must be less or equal that maxT available
                 "Buy amount exceeds allowance");
             
             if (buyAmtOrId == uint(-1)) {                               // user wants to buy the maxTimum possible
 
                 buyAmtT = maxT;           
-
             }
 
-            buyV = wmulV(buyAmtT, rate[buyToken], buyToken);         // final buy value in base currency
+            buyV = wmulV(buyAmtT, rate[buyToken], buyToken);            // final buy value in base currency
 
         } else if (canBuyErc721[buyToken]) {                            // if buyToken is a valid ERC721 token
 
             require(canSellErc20[sellToken],                            // require that at least one of sell and buy token is ERC20
                     "One of tokens must be erc20");
 
-            buyV = asm.getPrice(                                    // calculate price with Asset Management contract
+            buyV = asm.getPrice(                                        // calculate price with Asset Management contract
                 TrustedErc721(buyToken), 
                 buyAmtOrId);
 
@@ -651,8 +723,8 @@ contract CdcExchange is DSAuth, DSStop, DSMath, CdcExchangeEvents {
     * @dev Transfer sellToken from user and buyToken to user
     */
     function transferTokens(
-        uint256 valueSell,                                              // sell value after feeV was subtracted
-        uint256 valueBuy,                                               // buy value after feeV was subtracted
+        uint256 sellV,                                                  // sell value after feeV was subtracted
+        uint256 buyV,                                                   // buy value after feeV was subtracted
         address sellToken, 
         uint256 sellAmtOrId, 
         address buyToken,
@@ -664,8 +736,8 @@ contract CdcExchange is DSAuth, DSStop, DSMath, CdcExchangeEvents {
 
         if (canSellErc20[sellToken]) {                                  // if sellToken is a valid ERC20 token
 
-            sellAmtT = wdivT(                                       // calculate token amount to be sold
-                valueSell, 
+            sellAmtT = wdivT(                                           // calculate token amount to be sold
+                sellV, 
                 rate[sellToken], 
                 sellToken);
 
@@ -686,13 +758,13 @@ contract CdcExchange is DSAuth, DSStop, DSMath, CdcExchangeEvents {
             TrustedErc721(sellToken)                                    // transfer ERC721 token from user to custodian
             .transferFrom(
                 msg.sender, 
-                custodian721[sellToken][sellAmtOrId], 
+                TrustedErc721(sellToken).ownerOf(sellAmtOrId),
                 sellAmtOrId);
 
             asm.notifyTransferFrom(                                     // notify Asset Management contract about transfer
                 sellToken, 
                 msg.sender,
-                custodian721[sellToken][sellAmtOrId],
+                TrustedErc721(sellToken).ownerOf(sellAmtOrId),
                 sellAmtOrId);
 
             sellAmtT = sellAmtOrId;
@@ -700,11 +772,11 @@ contract CdcExchange is DSAuth, DSStop, DSMath, CdcExchangeEvents {
         
         if (canBuyErc20[buyToken]) {                                    // if buyToken is a valid ERC20 token
             
-            buyAmtT = wdivT(valueBuy, rate[buyToken], buyToken);    // calculate token amount to be bought
+            buyAmtT = wdivT(buyV, rate[buyToken], buyToken);            // calculate token amount to be bought
 
             if (handledByAsm[buyToken]) {                               // if token belongs to Asset Management
 
-                asm.sendToken(buyToken, msg.sender, buyAmtT);       // send token from Asset Management to user
+                asm.sendToken(buyToken, msg.sender, buyAmtT);           // send token from Asset Management to user
 
             } else {
 
@@ -716,20 +788,20 @@ contract CdcExchange is DSAuth, DSStop, DSMath, CdcExchangeEvents {
         
             TrustedErc721(buyToken)                                     // transfer buyToken from custodian20 to user
             .transferFrom(
-                custodian721[buyToken][buyAmtOrId],
+                TrustedErc721(buyToken).ownerOf(buyAmtOrId),
                 msg.sender,
                 buyAmtOrId);
 
             asm.notifyTransferFrom(                                     // notify Asset management about the transfer 
                 buyToken, 
-                custodian721[buyToken][buyAmtOrId],                       
+                TrustedErc721(buyToken).ownerOf(buyAmtOrId),                       
                 msg.sender,
                 buyAmtOrId);
 
             buyAmtT = buyAmtOrId;
         }
 
-        logTrade(sellToken, sellAmtT, valueSell, buyToken, buyAmtT, valueBuy, feeV);
+        logTrade(sellToken, sellAmtT, sellV, buyToken, buyAmtT, buyV, feeV);
     }
     
     /*
@@ -744,7 +816,10 @@ contract CdcExchange is DSAuth, DSStop, DSMath, CdcExchangeEvents {
         uint256 valueBuy,
         uint256 fee
     ) internal {
-        address custodian = canBuyErc20[buyToken] ? custodian20[buyToken] : custodian721[buyToken][buyAmtOrId];
+                
+        address custodian = canBuyErc20[buyToken] ? 
+            custodian20[buyToken] :
+            TrustedErc721(buyToken).ownerOf(buyAmtOrId);
 
         txId++;
 
@@ -790,47 +865,50 @@ contract CdcExchange is DSAuth, DSStop, DSMath, CdcExchangeEvents {
         address src;
         uint restFeeV;
 
-        feeTakenV = takeFeeInDptFromUser(fee);
+        feeTakenV = sellToken != dpt ?                      // if sellToken is not dpt then try to take fee in DPT
+            takeFeeInDptFromUser(fee) :
+            0;
         
-        if (fee - feeTakenV > dust && fee - feeTakenV < fee) {// if we could not take all fees from user ...
-                                                            // ... DPT (with round-off errors considered)
+        if (fee - feeTakenV > dust                          // if we could not take all fees from user in ... 
+            && fee - feeTakenV <= fee) {                    // ... DPT (with round-off errors considered)
+                                                            
             restFeeV = sub(fee, feeTakenV);
 
             if (canSellErc20[sellToken]) {
 
                 require(
                     canBuyErc20[buyToken] ||                // apply rule below to ERC721 buyTokens only
-                    sellV + dust >=                     // for erc721 buy tokens the sellValue must be buyValue plus restFeeV
+                    sellV + dust >=                         // for erc721 buy tokens the sellValue must be buyValue plus restFeeV
                         buyV + restFeeV,
-                    "Not enough funds to sell");
+                    "Not enough user funds to sell");
 
                 token = sellToken;                          // fees are sent in this token
-                src = msg.sender;                           // owner of restFeeV token is sender
-                amtT = sellAmtOrId;                          // max amount user wants to sell
+                src = msg.sender;                           // owner of token is sender
+                amtT = sellAmtOrId;                         // max amount user wants to sell
 
-                if (sellV + dust >=                     // if sellValue is higher or equal then buyValue plus restFeeV
-                    buyV + restFeeV) {   
-                
-                    sellV = buyV;                   // reduce sellValue to buyValue plus restFeeV
-
-                } else {                                    // if sellValue is lower than buyValue plus restFeeV and both buy and sell tokens are ERC20
+                if (add(sellV, dust) <                      // if buy value is too big
+                    add(buyV, restFeeV)) {                  
                     
-                    buyV = sub(sellV, restFeeV);         // buyValue is sellValue minus restFeeV 
-                    sellV = buyV;
+                    buyV = sub(sellV, restFeeV);            // buyValue is adjusted 
                 }
+
+                sellV = buyV;                               // reduce sellValue to buyValue plus restFeeV
 
             } else if (canBuyErc20[buyToken]) {             // if sellToken is an ERC721 token and buyToken is an ERC20 token
                 
                 require(
-                    sellV <= buyV + restFeeV + dust,     // sellValue must be smaller than buyValue plus restFeeV
+                    sellV <= buyV + restFeeV + dust,        // check if user can be supplied with enough buy tokens
                     "Not enough tokens to buy");
 
 
-                token = buyToken;                           // fees are sent in this token
+                token = buyToken;                           // fees are paid in buy token
+
                 src = custodian20[token];                   // source of funds is custodian
+                
                 amtT = buyAmtOrId;                          // max amount the user intended to buy 
 
-                if (sellV <= buyV + restFeeV + dust) 
+                if (sellV <= add(add(buyV, restFeeV), dust))
+                
                     buyV = sub(sellV, restFeeV); 
 
             } else {
@@ -847,8 +925,20 @@ contract CdcExchange is DSAuth, DSStop, DSMath, CdcExchangeEvents {
                 token != sellToken ||
                 buyV <= add(sellV, dust));
 
-            sendProfitAndCost(restFeeV, feeTakenV, token, src, amtT);
+            sendProfitAndCost(                              // send profit and costs in sellToken
+                restFeeV,
+                feeTakenV,
+                token,
+                src,
+                amtT);
+
+        } else {                                            // no fee must be payed with sellToken
+
+            sellV = min(buyV, sellV);
+            
+            buyV = sellV;
         }
+
 
         return (sellV, buyV);
     }
@@ -865,7 +955,7 @@ contract CdcExchange is DSAuth, DSStop, DSMath, CdcExchangeEvents {
     ) internal {
         uint profitV;
         uint profitDpt;
-        uint costToken;
+        uint costT;
         uint profitPaidV;
         uint totalProfitV;
         
@@ -878,16 +968,16 @@ contract CdcExchange is DSAuth, DSStop, DSMath, CdcExchangeEvents {
         profitV = sub(totalProfitV, profitPaidV);               // profit value still to be paid in base currency 
 
         profitDpt = wdivT(profitV, rate[dpt], dpt);             // profit in DPT still to be paid
-        
+
         sendToken(dpt, liq, burner, profitDpt);                 // send profit to burner
 
-        costToken = wdivT(fee, rate[token], token);             // convert fee from base currency to token amount 
+        costT = wdivT(fee, rate[token], token);                 // convert fee from base currency to token amount 
 
         require(
-            costToken < amountToken,                            // require that the cost we pay is less than user intended to pay
+            costT < amountToken,                                // require that the cost we pay is less than user intended to pay
             "Not enough token to pay fee"); 
 
-        sendToken(address(token), src, wal, costToken);         // send user token to wallet
+        sendToken(token, src, wal, costT);                      // send user token to wallet
     }
 
     /**
@@ -908,16 +998,16 @@ contract CdcExchange is DSAuth, DSStop, DSMath, CdcExchangeEvents {
             dpt20.allowance(msg.sender, address(this))
         );
         
-        if (dptUser == 0 || fee == 0) return 0;
+        if (dptUser == 0) return 0;
 
         uint feeDpt = wdivT(fee, rate[dpt], dpt);                   // fee in DPT
         
-        uint minDpt = min(feeDpt, dptUser);                         // get the minimum of fees to be paid and user balances
+        uint minDpt = min(feeDpt, dptUser);                         // get the maximum possible fee amount
         
 
         if (minDpt > 0) {
 
-            if (takeProfitOnlyInDpt) {
+            if (takeProfitOnlyInDpt) {                              // only profit is paid in dpt
 
                 profitDpt = min(wmul(feeDpt, profitRate), minDpt);
                 
@@ -927,7 +1017,7 @@ contract CdcExchange is DSAuth, DSStop, DSMath, CdcExchangeEvents {
 
                 profitDpt = wmul(minDpt, profitRate);
 
-                sendToken(dpt, msg.sender, burner, profitDpt);      // send profit
+                sendToken(dpt, msg.sender, burner, profitDpt);      // send profit to burner
 
                 costDpt = sub(minDpt, profitDpt);  
 
@@ -944,10 +1034,15 @@ contract CdcExchange is DSAuth, DSStop, DSMath, CdcExchangeEvents {
     /**
     * &dev send token or ether to destination
     */
-    function sendToken(address token, address src, address payable dst, uint256 amount) internal returns(uint256 etherSpent) {
+    function sendToken(
+        address token, 
+        address src,
+        address payable dst,
+        uint256 amount
+    ) internal returns(uint256 etherSpent) {
         TrustedErc20 erc20 = TrustedErc20(token);
 
-        if (token == address(0xee) && amount > dust) {              // if token is Ether and amount is higher than dust limit
+        if (token == eth && amount > dust) {                        // if token is Ether and amount is higher than dust limit
 
             // TODO: do it with call.value() to use gas as needed
             dst.transfer(amount);
