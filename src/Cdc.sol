@@ -1,4 +1,4 @@
-pragma solidity ^0.4.25;
+pragma solidity ^0.5.11;
 
 import "ds-token/token.sol";
 
@@ -8,15 +8,13 @@ import "ds-token/token.sol";
  */
 contract Cdc is DSToken {
     string public constant name = "Certified Diamond Coin";
-    bytes32 public constant symbol = "CDC";
     uint8 public constant decimals = 18 ;
+    bytes32 public cccc;
 
     /**
     * @dev Constructor that gives msg.sender all of existing tokens.
     */
-    constructor() DSToken(symbol) public {
-        uint totalSupply_ = mul(10 ** 7, (10 ** uint(decimals)));
-        super.mint(totalSupply_);
-        transfer(owner, totalSupply_);
+    constructor(bytes32 cccc_, bytes32 symbol_) DSToken(symbol_) public {
+        cccc = cccc_;
     }
 }

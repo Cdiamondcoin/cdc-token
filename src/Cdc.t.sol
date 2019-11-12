@@ -1,4 +1,4 @@
-pragma solidity ^0.4.25;
+pragma solidity ^0.5.11;
 
 import "ds-test/test.sol";
 import "ds-token/base.sol";
@@ -18,20 +18,32 @@ contract CdcTest is DSTest {
     CdcTester user;
 
     function setUp() public {
-        cdc = new Cdc();
+        cdc = new Cdc("BR,VS,G,0.05", "CDC");
         user = new CdcTester(cdc);
+    }
+
+    function testDiamondType() public {
+        assertEq(cdc.diamondType(), "BR,VS,G,0.05");
+    }
+    
+    function testSymbol() public {
+        assertEq(cdc.symbol(), "CDC");
     }
 
     function testMint() public {
         cdc.mint(10 ether);
+        assertEq(cdc.totalSupply(), 10 ether);
     }
 
     function testWeReallyGotAllTokens() public {
-        cdc.transfer(user, Cdc_SUPPLY);
-        assertEq(cdc.balanceOf(this), 0);
+        cdc.mint(address(this), Cdc_SUPPLY);
+        cdc.transfer(address(user), Cdc_SUPPLY);
+        assertEq(cdc.balanceOf(address(this)), 0);
+        assertEq(cdc.balanceOf(address(user)), Cdc_SUPPLY);
     }
 
     function testFailSendMoreThanAvailable() public {
-        cdc.transfer(user, Cdc_SUPPLY + 1);
+        cdc.mint(address(this), Cdc_SUPPLY);
+        cdc.transfer(address(user), Cdc_SUPPLY + 1);
     }
 }
