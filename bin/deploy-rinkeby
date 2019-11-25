@@ -6,7 +6,7 @@
 ### geth - https://github.com/ethereum/go-ethereum/wiki/Backup-&-restore
 ### parity - https://ethereum.stackexchange.com/questions/6471/where-are-my-keys-and-chain-data-located-if-i-am-using-parity
 
-set -ex
+set -x
 
 ## Settings for test networks like Rinkeby, Kovan, Ropsten
 
@@ -24,59 +24,38 @@ export ETH_GAS_PRICE=${ETH_GAS_PRICE:-"10000000000"}
 export ETH_FROM=0x9556E25F9b4D343ee38348b6Db8691d10fD08A61
 export ETH_PASSWORD=~/.eth-pwd
 
-dapp --use solc:0.4.25 build
+dapp build --extract
 
-hevm flatten --source-file src/Cdc.sol --json-file out/Cdc.sol.json > out/Cdc-flatt.sol
-hevm flatten --source-file src/CdcExchange.sol --json-file out/CdcExchange.sol.json > out/CdcExchange-flatt.sol
-hevm flatten --source-file src/CdcAuthority.sol --json-file out/CdcAuthority.sol.json > out/CdcAuthority-flatt.sol
-hevm flatten --source-file src/Burner.sol --json-file out/Burner.sol.json > out/Burner-flatt.sol
+hevm flatten --source-file src/Cdc.sol --json-file out/dapp.sol.json > out/Cdc-flatt.sol
+hevm flatten --source-file src/Burner.sol --json-file out/dapp.sol.json > out/Burner-flatt.sol
 
-# CDC=$(dapp create Cdc)
-CDC=0x42aC13dA77bc7204b61C8a44Acba4411Fc34bbbf
-# export CDC=$CDC
-# echo -e "Cdc DEPLOYED AT: $CDC"
+export cccc=$(seth --to-bytes32 $(seth --from-ascii "BR,VS,G,0.05"))
+export symbol=$(seth --to-bytes32 $(seth --from-ascii "CDC"))
+CDC=$(dapp create Cdc "$cccc" "$symbol")
+# CDC=0x42aC13dA77bc7204b61C8a44Acba4411Fc34bbbf
+export CDC=$CDC
+echo -e "Cdc DEPLOYED AT: $CDC"
 # test -z $CDC && exit 1
 
-DPT=0xb30041fF94fc8Fc071029F0ABc925A60B5a2059A
+# DPT=0xb30041fF94fc8Fc071029F0ABc925A60B5a2059A
 # export DPT=$DPT
 # echo -e "DPT DEPLOYED AT: $DPT"
 # test -z $DPT && exit 1
 
-BURNER=$(dapp create Burner "$DPT")
-export BURNER=$BURNER
-echo -e "Burner DEPLOYED AT: $BURNER"
-test -z $BURNER && exit 1
+# BURNER=$(dapp create Burner "$DPT")
+# export BURNER=$BURNER
+# echo -e "Burner DEPLOYED AT: $BURNER"
 
+# ETH_FEED=$(dapp create TestMedianizerLike $(seth --to-uint256 $(seth --to-wei 250 eth)) true)
+# export ETH_FEED=$ETH_FEED
+# echo -e "ETH MedianizerLike DEPLOYED AT: $ETH_FEED"
+# test -z $ETH_FEED && exit 1
 
-DPT_FEED=0x97e4b0634971c2b286eab779bb672cf69fe525d2
-export DPT_FEED=$DPT_FEED
-echo -e "DPT Medianizer DEPLOYED AT: $DPT_FEED"
+# CdcAuthority=$(dapp create CdcAuthority)
+# export CdcAuthority=$CdcAuthority
+# echo -e "CdcAuthority DEPLOYED AT: $CdcAuthority"
 
-ETH_FEED=$(dapp create TestMedianizerLike $(seth --to-uint256 $(seth --to-wei 250 eth)) true)
-export ETH_FEED=$ETH_FEED
-echo -e "ETH MedianizerLike DEPLOYED AT: $ETH_FEED"
-test -z $ETH_FEED && exit 1
-
-CDC_FEED=$(dapp create TestMedianizerLike $(seth --to-uint256 $(seth --to-wei 30 eth)) true)
-export CDC_FEED=$CDC_FEED
-echo -e "CDC MedianizerLike DEPLOYED AT: $CDC_FEED"
-test -z $CDC_FEED && exit 1
-
-CdcExchange=$(dapp create CdcExchange "$CDC" "$DPT" "$CDC_FEED" "$DPT_FEED" "$ETH_FEED" "$ETH_FROM" "$BURNER" $(seth --to-uint256 $(seth --to-wei 12 eth)) $(seth --to-uint256 $(seth --to-wei 30 eth)) $(seth --to-uint256 $(seth --to-wei 230 eth)))
-export CdcExchange=$CdcExchange
-echo -e "CdcExchange DEPLOYED AT: $CdcExchange"
-
-CdcAuthority=$(dapp create CdcAuthority)
-export CdcAuthority=$CdcAuthority
-echo -e "CdcAuthority DEPLOYED AT: $CdcAuthority"
-
-seth send $CdcExchange "setAuthority(address)" $CdcAuthority
-
-# enable CdcExchange to manage Cdc tokens
-seth send $CDC "approve(address,uint)" $CdcExchange ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
-
-# enable CdcExchange to manage DPT tokens (for fee)
-seth send $DPT "approve(address,uint)" $CdcExchange ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
+# seth send $CdcExchange "setAuthority(address)" $CdcAuthority
 
 # seth send 0x9537040cd32ed8abd5f04fbb7b83f619626a5079 "mintDiamondTo(address, string memory, uint, string memory)" 0x9556E25F9b4D343ee38348b6Db8691d10fD08A61 "7296159263" 00000000000000000000000000000000000000000000000009da6d3cfe870000 ""
 # seth call 0x9537040cd32ed8abd5f04fbb7b83f619626a5079 "diamondCaratByIndex(uint)" 0
