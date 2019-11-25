@@ -23,9 +23,9 @@ contract CdcTest is DSTest {
     }
 
     function testDiamondType() public {
-        assertEq(cdc.diamondType(), "BR,VS,G,0.05");
+        assertEq(cdc.cccc(), "BR,VS,G,0.05");
     }
-    
+
     function testSymbol() public {
         assertEq(cdc.symbol(), "CDC");
     }
