@@ -1,6 +1,6 @@
 # CDiamondcoin Diamond Exchange Smart Contract
 
-One of the main goal of [Diamond Network Project](https://cdiamondcoin.com/) is to create a diamond backed stable coin. In order to enable this an exchange is needed where users can buy and sell their diamonds on the chain while the physical diamonds are sored in safe and regularly audited sotres. This smart contract can handle both investment diamonds and the CDC stablecoin. 
+One of the main goal of [CDC Token of Cdiamondcoin OU](https://cdiamondcoin.com/) is to create a diamond backed stable coin. In order to enable this an exchange is needed where users can buy and sell their diamonds on the chain while the physical diamonds are sored in safe and regularly audited sotres. This smart contract can handle both investment diamonds and the CDC stablecoin. 
 
 ## Prerequisities
 
